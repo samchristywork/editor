@@ -400,6 +400,53 @@ void backspace_char(Window *window) {
   }
 }
 
+static bool is_word_char(char c) {
+  return isalnum((unsigned char)c) || c == '_';
+}
+
+void delete_word(Window *window) {
+  Buffer *buffer = window->current_buffer;
+  size_t row = window->cursor.row - 1;
+  size_t col = window->cursor.column - 1;
+
+  if (buffer->length == 0) {
+    return;
+  }
+
+  Line *line = &buffer->lines[row];
+
+  if (col >= line->length) {
+    return;
+  }
+
+  if (!is_word_char(line->data[col])) {
+    return;
+  }
+
+  size_t start = col;
+  while (start > 0 && is_word_char(line->data[start - 1])) {
+    start--;
+  }
+
+  size_t end = col;
+  while (end < line->length && is_word_char(line->data[end])) {
+    end++;
+  }
+
+  size_t delete_count = end - start;
+  if (delete_count > 0) {
+    memmove(line->data + start, line->data + end, line->length - end);
+    line->length -= delete_count;
+    if (line->length > 0) {
+      line->data = realloc(line->data, line->length);
+    } else {
+      free(line->data);
+      line->data = NULL;
+    }
+    window->cursor.column = start + 1;
+  }
+}
+
 void yank_selection(Context *ctx) {
   Window *window = ctx->windows[ctx->current_window];
   Buffer *buffer = window->current_buffer;
