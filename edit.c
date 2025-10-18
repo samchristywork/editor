@@ -323,6 +323,35 @@ void insert_newline(Window *window) {
   window->cursor.column = 1;
 }
 
+void delete_char(Window *window) {
+  Buffer *buffer = window->current_buffer;
+  size_t row = window->cursor.row - 1;
+  size_t col = window->cursor.column - 1;
+
+  if (buffer->length == 0) {
+    return;
+  }
+
+  Line *line = &buffer->lines[row];
+
+  if (line->length == 0) {
+    return;
+  }
+
+  if (col >= line->length) {
+    col = line->length - 1;
+  }
+
+  memmove(line->data + col, line->data + col + 1, line->length - col - 1);
+  line->length--;
+  if (line->length > 0) {
+    line->data = realloc(line->data, line->length);
+  } else {
+    free(line->data);
+    line->data = NULL;
+  }
+}
+
 void backspace_char(Window *window) {
   Buffer *buffer = window->current_buffer;
   size_t row = window->cursor.row - 1;
