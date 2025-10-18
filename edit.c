@@ -447,6 +447,39 @@ void delete_word(Window *window) {
   }
 }
 
+void delete_line(Window *window) {
+  Buffer *buffer = window->current_buffer;
+  size_t row = window->cursor.row - 1;
+
+  if (buffer->length == 0) {
+    return;
+  }
+
+  Line *line = &buffer->lines[row];
+
+  if (line->data != NULL) {
+    free(line->data);
+  }
+
+  if (buffer->length == 1) {
+    line->data = NULL;
+    line->length = 0;
+    window->cursor.column = 1;
+    return;
+  }
+
+  memmove(&buffer->lines[row], &buffer->lines[row + 1],
+          sizeof(Line) * (buffer->length - row - 1));
+
+  buffer->length--;
+  buffer->lines = realloc(buffer->lines, sizeof(Line) * buffer->length);
+
+  if (row >= buffer->length) {
+    window->cursor.row = buffer->length;
+  }
+  window->cursor.column = 1;
+}
+
 void yank_selection(Context *ctx) {
   Window *window = ctx->windows[ctx->current_window];
   Buffer *buffer = window->current_buffer;

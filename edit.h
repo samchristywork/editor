@@ -11,6 +11,8 @@ void delete_char(Window *window);
 
 void backspace_char(Window *window);
 
+void delete_line(Window *window);
+
 void delete_word(Window *window);
 
 void yank_selection(Context *ctx);
