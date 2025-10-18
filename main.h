@@ -2,6 +2,7 @@
 #define MAIN_H
 
 #include <stddef.h>
+#include <termios.h>
 
 typedef enum { MODE_INSERT, MODE_NORMAL } EditorMode;
 

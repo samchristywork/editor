@@ -1,12 +1,16 @@
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/ioctl.h>
 #include <termios.h>
 #include <unistd.h>
 
+#include "draw.h"
+#include "edit.h"
+#include "input.h"
 #include "main.h"
 
-#define MILLISECONDS 1000
 Context *global_ctx;
 
 void enter_alt_screen() {
@@ -107,6 +111,35 @@ Buffer *create_buffer_from_file(File file) {
   }
 
   return buffer;
+}
+
+void init_buffers(Context *ctx, FileList file_list) {
+  ctx->n_buffers = file_list.length;
+  ctx->buffers = malloc(file_list.length * sizeof(Buffer *));
+  if (ctx->buffers == NULL) {
+    exit(EXIT_FAILURE);
+  }
+  for (int i = 0; i < file_list.length; i++) {
+    Buffer *b = create_buffer_from_file(file_list.files[i]);
+    if (b == NULL) {
+      exit(EXIT_FAILURE);
+    }
+    ctx->buffers[i] = b;
+  }
+}
+
+void add_file(FileList *file_list, char *filename) {
+  file_list->length++;
+  file_list->files =
+      realloc(file_list->files, file_list->length * sizeof(File));
+  if (file_list->files == NULL) {
+    exit(EXIT_FAILURE);
+  }
+
+  file_list->files[file_list->length - 1].name = strdup(filename);
+  if (file_list->files[file_list->length - 1].name == NULL) {
+    exit(EXIT_FAILURE);
+  }
 }
 
 int main(int argc, char *argv[]) {
