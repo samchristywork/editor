@@ -5,6 +5,10 @@
 
 void insert_char(Window *window, char c);
 
+void insert_newline(Window *window);
+
+void backspace_char(Window *window);
+
 void yank_selection(Context *ctx);
 
 void paste_buffer(Context *ctx);

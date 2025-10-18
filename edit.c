@@ -277,6 +277,100 @@ void insert_char(Window *window, char c) {
   window->cursor.column++;
 }
 
+void insert_newline(Window *window) {
+  Buffer *buffer = window->current_buffer;
+  size_t row = window->cursor.row - 1;
+  size_t col = window->cursor.column - 1;
+
+  ensure_buffer_initialized(buffer);
+
+  Line *current_line = &buffer->lines[row];
+  size_t old_length = current_line->length;
+  char *old_data = current_line->data;
+
+  char *new_current_data = NULL;
+  if (col > 0) {
+    new_current_data = malloc(col);
+    if (new_current_data != NULL) {
+      memcpy(new_current_data, old_data, col);
+    }
+  }
+
+  char *new_line_data = NULL;
+  size_t new_line_length = old_length - col;
+  if (new_line_length > 0) {
+    new_line_data = malloc(new_line_length);
+    if (new_line_data != NULL) {
+      memcpy(new_line_data, old_data + col, new_line_length);
+    }
+  }
+
+  free(old_data);
+
+  buffer->lines = realloc(buffer->lines, sizeof(Line) * (buffer->length + 1));
+  memmove(&buffer->lines[row + 2], &buffer->lines[row + 1],
+          sizeof(Line) * (buffer->length - row - 1));
+
+  buffer->lines[row].data = new_current_data;
+  buffer->lines[row].length = col;
+
+  buffer->lines[row + 1].data = new_line_data;
+  buffer->lines[row + 1].length = new_line_length;
+
+  buffer->length++;
+
+  window->cursor.row++;
+  window->cursor.column = 1;
+}
+
+void backspace_char(Window *window) {
+  Buffer *buffer = window->current_buffer;
+  size_t row = window->cursor.row - 1;
+  size_t col = window->cursor.column - 1;
+
+  if (buffer->length == 0) {
+    return;
+  }
+
+  Line *line = &buffer->lines[row];
+
+  if (col == 0) {
+    if (row == 0) {
+      return;
+    }
+
+    Line *prev_line = &buffer->lines[row - 1];
+    size_t prev_length = prev_line->length;
+
+    if (line->length > 0) {
+      prev_line->data =
+          realloc(prev_line->data, prev_line->length + line->length);
+      memcpy(prev_line->data + prev_line->length, line->data, line->length);
+      prev_line->length += line->length;
+      free(line->data);
+    }
+
+    memmove(&buffer->lines[row], &buffer->lines[row + 1],
+            sizeof(Line) * (buffer->length - row - 1));
+
+    buffer->length--;
+    buffer->lines = realloc(buffer->lines, sizeof(Line) * buffer->length);
+
+    window->cursor.row--;
+    window->cursor.column = prev_length + 1;
+  } else if (col > 0 && col <= line->length) {
+    memmove(line->data + col - 1, line->data + col, line->length - col);
+    line->length--;
+    window->cursor.column--;
+    if (line->length > 0) {
+      line->data = realloc(line->data, line->length);
+    } else {
+      free(line->data);
+      line->data = NULL;
+    }
+  }
+}
+
 void yank_selection(Context *ctx) {
   Window *window = ctx->windows[ctx->current_window];
   Buffer *buffer = window->current_buffer;
