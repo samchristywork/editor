@@ -166,6 +166,101 @@ static void yank_multiple_lines(Context *ctx, Buffer *buffer, size_t start_row,
   }
 }
 
+static void paste_linewise(Context *ctx, Window *window, Buffer *buffer) {
+  size_t insert_row = window->cursor.row;
+
+  buffer->lines = realloc(
+      buffer->lines, sizeof(Line) * (buffer->length + ctx->yank_buffer_length));
+  memmove(&buffer->lines[insert_row + ctx->yank_buffer_length],
+          &buffer->lines[insert_row],
+          sizeof(Line) * (buffer->length - insert_row));
+
+  for (size_t i = 0; i < ctx->yank_buffer_length; i++) {
+    size_t len = ctx->yank_buffer_lengths[i];
+    if (ctx->yank_buffer[i] != NULL && len > 0) {
+      buffer->lines[insert_row + i].data = malloc(len);
+      memcpy(buffer->lines[insert_row + i].data, ctx->yank_buffer[i], len);
+      buffer->lines[insert_row + i].length = len;
+    } else {
+      buffer->lines[insert_row + i].data = NULL;
+      buffer->lines[insert_row + i].length = 0;
+    }
+  }
+
+  buffer->length += ctx->yank_buffer_length;
+  window->cursor.row = insert_row + 1;
+  window->cursor.column = 1;
+}
+
+static void paste_single_line(Context *ctx, Window *window, Buffer *buffer) {
+  size_t row = window->cursor.row - 1;
+  size_t col = window->cursor.column - 1;
+  size_t yank_len = ctx->yank_buffer_lengths[0];
+
+  if (ctx->yank_buffer[0] != NULL && yank_len > 0) {
+    Line *line = &buffer->lines[row];
+    line->data = realloc(line->data, line->length + yank_len);
+    memmove(line->data + col + yank_len, line->data + col, line->length - col);
+    memcpy(line->data + col, ctx->yank_buffer[0], yank_len);
+    line->length += yank_len;
+    window->cursor.column += yank_len;
+  }
+}
+
+static void paste_multiple_lines(Context *ctx, Window *window, Buffer *buffer) {
+  size_t row = window->cursor.row - 1;
+  size_t col = window->cursor.column - 1;
+  Line *current_line = &buffer->lines[row];
+
+  char *rest_of_line = NULL;
+  size_t rest_len = 0;
+  if (col < current_line->length) {
+    rest_len = current_line->length - col;
+    rest_of_line = malloc(rest_len);
+    if (rest_of_line != NULL) {
+      memcpy(rest_of_line, current_line->data + col, rest_len);
+    }
+    current_line->length = col;
+    current_line->data = realloc(current_line->data, col);
+  }
+
+  buffer->lines = realloc(
+      buffer->lines, sizeof(Line) * (buffer->length + ctx->yank_buffer_length));
+  memmove(&buffer->lines[row + ctx->yank_buffer_length],
+          &buffer->lines[row + 1], sizeof(Line) * (buffer->length - row - 1));
+
+  for (size_t i = 0; i < ctx->yank_buffer_length; i++) {
+    size_t yank_len = ctx->yank_buffer_lengths[i];
+    if (ctx->yank_buffer[i] != NULL && yank_len > 0) {
+      if (i == 0) {
+        Line *line = &buffer->lines[row];
+        line->data = realloc(line->data, line->length + yank_len);
+        memcpy(line->data + line->length, ctx->yank_buffer[i], yank_len);
+        line->length += yank_len;
+      } else if (i == ctx->yank_buffer_length - 1) {
+        buffer->lines[row + i].data = malloc(yank_len + rest_len);
+        memcpy(buffer->lines[row + i].data, ctx->yank_buffer[i], yank_len);
+        if (rest_of_line != NULL) {
+          memcpy(buffer->lines[row + i].data + yank_len, rest_of_line,
+                 rest_len);
+        }
+        buffer->lines[row + i].length = yank_len + rest_len;
+      } else {
+        buffer->lines[row + i].data = malloc(yank_len);
+        memcpy(buffer->lines[row + i].data, ctx->yank_buffer[i], yank_len);
+        buffer->lines[row + i].length = yank_len;
+      }
+    } else {
+      buffer->lines[row + i].data = NULL;
+      buffer->lines[row + i].length = 0;
+    }
+  }
+
+  buffer->length += ctx->yank_buffer_length - 1;
+  window->cursor.row += ctx->yank_buffer_length - 1;
+  free(rest_of_line);
+}
+
 void insert_char(Window *window, char c) {
   Buffer *buffer = window->current_buffer;
   size_t row = window->cursor.row - 1;
@@ -204,6 +299,25 @@ void yank_selection(Context *ctx) {
       yank_single_line(ctx, buffer, start_row, start_col, end_col);
     } else {
       yank_multiple_lines(ctx, buffer, start_row, start_col, end_row, end_col);
+    }
+  }
+}
+
+void paste_buffer(Context *ctx) {
+  Window *window = ctx->windows[ctx->current_window];
+  Buffer *buffer = window->current_buffer;
+
+  if (ctx->yank_buffer == NULL || ctx->yank_buffer_length == 0) {
+    return;
+  }
+
+  if (ctx->yank_linewise) {
+    paste_linewise(ctx, window, buffer);
+  } else {
+    if (ctx->yank_buffer_length == 1) {
+      paste_single_line(ctx, window, buffer);
+    } else {
+      paste_multiple_lines(ctx, window, buffer);
     }
   }
 }

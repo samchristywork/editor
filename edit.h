@@ -7,6 +7,8 @@ void insert_char(Window *window, char c);
 
 void yank_selection(Context *ctx);
 
+void paste_buffer(Context *ctx);
+
 void init_undo_stack(Context *ctx);
 
 void free_undo_stack(Context *ctx);
