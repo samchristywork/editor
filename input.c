@@ -1,4 +1,7 @@
+#include <ctype.h>
+#include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 
 #include "draw.h"
@@ -89,6 +92,28 @@ static bool find_occurrence(Window *window, const char *search_str,
   }
 
   return false;
+}
+
+static void save_buffer(Buffer *buffer) {
+  if (buffer == NULL || buffer->file.name == NULL) {
+    return;
+  }
+
+  FILE *f = fopen(buffer->file.name, "w");
+  if (f == NULL) {
+    return;
+  }
+
+  for (size_t i = 0; i < buffer->length; i++) {
+    if (buffer->lines[i].length > 0) {
+      fwrite(buffer->lines[i].data, 1, buffer->lines[i].length, f);
+    }
+    if (i < buffer->length) {
+      fputc('\n', f);
+    }
+  }
+
+  fclose(f);
 }
 
 void handle_input(Context *ctx) {
