@@ -358,11 +358,17 @@ static void draw_window(Window *window, EditorMode mode, Selection *selection) {
   fflush(stdout);
 }
 
-void draw_screen(Window *window, size_t width, size_t height) {
-  draw_status_bar(width);
-  window->row = 2;
+void draw_screen(Window *window, size_t width, size_t height, EditorMode mode,
+                 Selection *selection, char *command_buffer,
+                 size_t command_buffer_length, char *search_buffer,
+                 size_t search_buffer_length) {
+  constrain_cursor(window);
+  window->row = 1;
   window->column = 1;
   window->width = width;
-  window->height = height;
-  draw_window(window);
+  window->height = height - 1;
+  update_scroll(window);
+  draw_status_bar(width, height, window->cursor, mode, command_buffer,
+                  command_buffer_length, search_buffer, search_buffer_length);
+  draw_window(window, mode, selection);
 }
