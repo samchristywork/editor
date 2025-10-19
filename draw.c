@@ -150,6 +150,44 @@ static void draw_status_bar(size_t width, size_t height, Cursor cursor,
   fflush(stdout);
 }
 
+static bool is_in_selection(size_t row, size_t col, EditorMode mode,
+                            Selection *selection) {
+  if (mode != MODE_LINEWISE_VISUAL && mode != MODE_CHARACTERWISE_VISUAL) {
+    return false;
+  }
+
+  size_t start_row = selection->start.row;
+  size_t start_col = selection->start.column;
+  size_t end_row = selection->end.row;
+  size_t end_col = selection->end.column;
+
+  if (start_row > end_row || (start_row == end_row && start_col > end_col)) {
+    size_t tmp = start_row;
+    start_row = end_row;
+    end_row = tmp;
+    tmp = start_col;
+    start_col = end_col;
+    end_col = tmp;
+  }
+
+  if (mode == MODE_LINEWISE_VISUAL) {
+    return row >= start_row && row <= end_row;
+  } else {
+    if (row < start_row || row > end_row) {
+      return false;
+    }
+    if (start_row == end_row) {
+      return col >= start_col && col <= end_col;
+    } else if (row == start_row) {
+      return col >= start_col;
+    } else if (row == end_row) {
+      return col <= end_col;
+    } else {
+      return true;
+    }
+  }
+}
+
 static void draw_line(Window *window, Line line, size_t n, EditorMode mode,
                       Selection *selection) {
   Cursor cursor = window->cursor;
