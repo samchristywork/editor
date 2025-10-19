@@ -116,13 +116,30 @@ static void set_cursor_position(size_t row, size_t column) {
   printf("\x1b[%zu;%zuH", row, column);
 }
 
-void draw_status_bar(size_t width) {
-  set_cursor_position(1, 1);
+static void draw_status_bar(size_t width, size_t height, Cursor cursor,
+                            EditorMode mode, char *command_buffer,
+                            size_t command_buffer_length, char *search_buffer,
+                            size_t search_buffer_length) {
+  set_cursor_position(height, 1);
   printf("\x1b[7m");
   char status_bar_text[256];
-  snprintf(status_bar_text, 256, "%s %d", "Status Bar", width);
+  if (mode == MODE_COMMAND) {
+    snprintf(status_bar_text, 256, ":%.*s", (int)command_buffer_length,
+             command_buffer ? command_buffer : "");
+  } else if (mode == MODE_SEARCH) {
+    snprintf(status_bar_text, 256, "/%.*s", (int)search_buffer_length,
+             search_buffer ? search_buffer : "");
+  } else if (mode == MODE_LINEWISE_VISUAL) {
+    snprintf(status_bar_text, 256, "-- VISUAL LINE -- %zu %zu", cursor.row,
+             cursor.column);
+  } else if (mode == MODE_CHARACTERWISE_VISUAL) {
+    snprintf(status_bar_text, 256, "-- VISUAL -- %zu %zu", cursor.row,
+             cursor.column);
+  } else {
+    snprintf(status_bar_text, 256, "%zu %zu", cursor.row, cursor.column);
+  }
   size_t len = strlen(status_bar_text);
-  for (int i = 0; i < width; i++) {
+  for (size_t i = 0; i < width; i++) {
     if (i < len) {
       putchar(status_bar_text[i]);
     } else {
@@ -133,18 +150,25 @@ void draw_status_bar(size_t width) {
   fflush(stdout);
 }
 
-void draw_line(Window *window, Line line, int n) {
+static void draw_line(Window *window, Line line, size_t n, EditorMode mode,
+                      Selection *selection) {
   Cursor cursor = window->cursor;
+  Scroll scroll = window->scroll;
   set_cursor_position(window->row + n, window->column);
   for (int i = 0; i < window->width; i++) {
     bool on_cursor = cursor.row - 1 == n && cursor.column - 1 == i;
     if (on_cursor) {
       printf("\x1b[7m");
-    }
-    if (i < line.length) {
-      putchar(line.data[i]);
+      needs_reset = true;
+    } else if (in_selection) {
+      printf("\x1b[48;5;240m");
+      needs_reset = true;
     } else {
-      putchar(' ');
+      const char *color = get_syntax_color(&syntax_state, is_num);
+      if (color) {
+        printf("%s", color);
+        needs_reset = true;
+      }
     }
     if (on_cursor) {
       printf("\x1b[0m");
