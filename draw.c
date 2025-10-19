@@ -328,7 +328,22 @@ static void constrain_cursor(Window *window) {
         window->current_buffer->lines[window->cursor.row - 1].length + 1;
 }
 
-void draw_window(Window *window) {
+static void update_scroll(Window *window) {
+  if (window->cursor.row < window->scroll.vertical + 1) {
+    window->scroll.vertical = window->cursor.row - 1;
+  }
+  if (window->cursor.row > window->scroll.vertical + window->height) {
+    window->scroll.vertical = window->cursor.row - window->height;
+  }
+  if (window->cursor.column < window->scroll.horizontal + 1) {
+    window->scroll.horizontal = window->cursor.column - 1;
+  }
+  if (window->cursor.column > window->scroll.horizontal + window->width) {
+    window->scroll.horizontal = window->cursor.column - window->width;
+  }
+}
+
+static void draw_window(Window *window) {
   Buffer *current_buffer = window->current_buffer;
   constrain_cursor(window);
 
