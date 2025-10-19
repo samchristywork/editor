@@ -284,13 +284,38 @@ static void draw_line(Window *window, Line line, size_t n, EditorMode mode,
         needs_reset = true;
       }
     }
-    if (on_cursor) {
-      printf("\x1b[0m");
+
+    putchar(c);
+
+    if (needs_reset) {
+      printf(COLOR_RESET);
     }
+
+    if (is_closing_char) {
+      if (c == '*') {
+        syntax_state.in_block_comment = false;
+      } else if (c == '\'') {
+        syntax_state.in_single_quote_string = false;
+      } else if (c == '"') {
+        syntax_state.in_double_quote_string = false;
+      }
+    }
+
+    if (i == window->width - 1) {
+      syntax_state.in_line_comment = false;
+      syntax_state.in_preprocessor_directive = false;
+    }
+  }
+
+  if (is_keyword_char) {
+    free(is_keyword_char);
+  }
+  if (is_number_char) {
+    free(is_number_char);
   }
 }
 
-void constrain_cursor(Window *window) {
+static void constrain_cursor(Window *window) {
   if (window->cursor.row < 1)
     window->cursor.row = 1;
   if (window->cursor.column < 1)
