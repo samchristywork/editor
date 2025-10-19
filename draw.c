@@ -193,8 +193,84 @@ static void draw_line(Window *window, Line line, size_t n, EditorMode mode,
   Cursor cursor = window->cursor;
   Scroll scroll = window->scroll;
   set_cursor_position(window->row + n, window->column);
-  for (int i = 0; i < window->width; i++) {
-    bool on_cursor = cursor.row - 1 == n && cursor.column - 1 == i;
+
+  SyntaxState syntax_state = {0};
+
+  bool *is_keyword_char = calloc(line.length, sizeof(bool));
+  bool *is_number_char = calloc(line.length, sizeof(bool));
+
+  if (is_keyword_char && is_number_char) {
+    size_t word_start = 0;
+    size_t word_len = 0;
+    bool in_word = false;
+
+    for (size_t col = 0; col < line.length; col++) {
+      char c = line.data[col];
+      if (isalnum(c) || c == '_') {
+        if (!in_word) {
+          in_word = true;
+          word_start = col;
+          word_len = 0;
+        }
+        word_len++;
+      } else {
+        if (in_word && word_len > 0) {
+          if (is_keyword(line.data + word_start, word_len)) {
+            for (size_t k = word_start; k < word_start + word_len; k++) {
+              is_keyword_char[k] = true;
+            }
+          } else if (isdigit(line.data[word_start])) {
+            for (size_t k = word_start; k < word_start + word_len; k++) {
+              is_number_char[k] = true;
+            }
+          }
+        }
+        in_word = false;
+        word_len = 0;
+      }
+    }
+    if (in_word && word_len > 0) {
+      if (is_keyword(line.data + word_start, word_len)) {
+        for (size_t k = word_start; k < word_start + word_len; k++) {
+          is_keyword_char[k] = true;
+        }
+      } else if (isdigit(line.data[word_start])) {
+        for (size_t k = word_start; k < word_start + word_len; k++) {
+          is_number_char[k] = true;
+        }
+      }
+    }
+  }
+
+  for (size_t i = 0; i < window->width; i++) {
+    size_t buffer_col = scroll.horizontal + i;
+    size_t buffer_row = scroll.vertical + n;
+    bool on_cursor =
+        cursor.row - 1 == buffer_row && cursor.column - 1 == buffer_col;
+    bool in_selection =
+        is_in_selection(buffer_row + 1, buffer_col + 1, mode, selection);
+
+    char c = (buffer_col < line.length) ? line.data[buffer_col] : ' ';
+    char next_c =
+        (buffer_col + 1 < line.length) ? line.data[buffer_col + 1] : '\0';
+
+    bool is_closing_char = false;
+    bool is_num = false;
+
+    if (buffer_col < line.length) {
+      update_syntax_state(&syntax_state, c, next_c, line.data,
+                          line.data + buffer_col, &is_closing_char);
+
+      if (is_keyword_char && buffer_col < line.length) {
+        syntax_state.in_keyword = is_keyword_char[buffer_col];
+      }
+      if (is_number_char && buffer_col < line.length) {
+        is_num = is_number_char[buffer_col];
+      }
+    }
+
+    bool needs_reset = false;
+
     if (on_cursor) {
       printf("\x1b[7m");
       needs_reset = true;
