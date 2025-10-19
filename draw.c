@@ -343,16 +343,16 @@ static void update_scroll(Window *window) {
   }
 }
 
-static void draw_window(Window *window) {
+static void draw_window(Window *window, EditorMode mode, Selection *selection) {
   Buffer *current_buffer = window->current_buffer;
-  constrain_cursor(window);
 
-  Line eof_line = {.data = "EOF", .length = 3};
-  for (int i = 0; i < window->height; i++) {
-    if (i < current_buffer->length) {
-      draw_line(window, current_buffer->lines[i], i);
+  Line eof_line = {.data = "~", .length = 1};
+  for (size_t i = 0; i < window->height; i++) {
+    size_t buffer_row = window->scroll.vertical + i;
+    if (buffer_row < current_buffer->length) {
+      draw_line(window, current_buffer->lines[buffer_row], i, mode, selection);
     } else {
-      draw_line(window, eof_line, i);
+      draw_line(window, eof_line, i, mode, selection);
     }
   }
   fflush(stdout);
