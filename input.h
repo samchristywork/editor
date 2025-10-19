@@ -3,7 +3,6 @@
 
 #include "main.h"
 
-void handle_input(Window *window, bool *running, EditorMode *mode, size_t width,
-                  size_t height);
+void handle_input(Context *ctx);
 
 #endif
