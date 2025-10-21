@@ -1,10 +1,18 @@
 #ifndef MAIN_H
 #define MAIN_H
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <termios.h>
 
-typedef enum { MODE_INSERT, MODE_NORMAL } EditorMode;
+typedef enum {
+  MODE_COMMAND,
+  MODE_INSERT,
+  MODE_NORMAL,
+  MODE_LINEWISE_VISUAL,
+  MODE_CHARACTERWISE_VISUAL,
+  MODE_SEARCH
+} EditorMode;
 
 typedef struct {
   size_t height;
@@ -26,6 +34,16 @@ typedef struct {
   Line *lines;
   size_t length;
 } Buffer;
+
+typedef struct {
+  size_t row;
+  size_t column;
+} Position;
+
+typedef struct {
+  Position start;
+  Position end;
+} Selection;
 
 typedef struct {
   size_t row;
