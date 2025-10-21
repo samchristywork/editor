@@ -171,6 +171,21 @@ void handle_input(Context *ctx) {
         case 'G':
           window->cursor.row = window->current_buffer->length;
           break;
+        case 'x':
+          push_undo_state(ctx);
+          delete_char(window);
+          break;
+        case 'd':
+          if (read(STDIN_FILENO, &c, 1) == 1) {
+            if (c == 'd') {
+              push_undo_state(ctx);
+              delete_line(window);
+            } else if (c == 'w') {
+              push_undo_state(ctx);
+              delete_word(window);
+            }
+          }
+          break;
         case 'i':
           *mode = MODE_INSERT;
           break;
@@ -185,7 +200,7 @@ void handle_input(Context *ctx) {
           break;
         case 127:
         case 8:
-          delete_char(window);
+          backspace_char(window);
           break;
         case '\r':
         case '\n':
