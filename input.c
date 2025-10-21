@@ -151,6 +151,26 @@ void handle_input(Context *ctx) {
         case 'l':
           window->cursor.column++;
           break;
+        case 4:
+          window->cursor.row += window->height / 2;
+          break;
+        case 21:
+          if (window->cursor.row < window->height / 2) {
+            window->cursor.row = 0;
+          } else {
+            window->cursor.row -= window->height / 2;
+          }
+          break;
+        case 'g':
+          if (read(STDIN_FILENO, &c, 1) == 1) {
+            if (c == 'g') {
+              window->cursor.row = 1;
+            }
+          }
+          break;
+        case 'G':
+          window->cursor.row = window->current_buffer->length;
+          break;
         case 'i':
           *mode = MODE_INSERT;
           break;
