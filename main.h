@@ -66,6 +66,18 @@ typedef struct {
 } Window;
 
 typedef struct {
+  Line *lines;
+  size_t length;
+  Cursor cursor;
+} UndoState;
+
+typedef struct {
+  UndoState *states;
+  size_t length;
+  size_t capacity;
+} UndoStack;
+
+typedef struct {
   Terminal terminal;
   Window **windows;
   size_t n_windows;
@@ -74,6 +86,16 @@ typedef struct {
   size_t n_buffers;
   bool running;
   EditorMode mode;
+  Selection selection;
+  char *command_buffer;
+  size_t command_buffer_length;
+  char *search_buffer;
+  size_t search_buffer_length;
+  char **yank_buffer;
+  size_t *yank_buffer_lengths;
+  size_t yank_buffer_length;
+  bool yank_linewise;
+  UndoStack undo_stack;
 } Context;
 
 typedef struct {
