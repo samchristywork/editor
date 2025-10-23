@@ -274,6 +274,52 @@ static void draw_line(Window *window, Line line, size_t n, EditorMode mode,
     }
   }
 
+  // First, process the entire line to update syntax state correctly
+  for (size_t col = 0; col < line.length; col++) {
+    char c = line.data[col];
+    char next_c = (col + 1 < line.length) ? line.data[col + 1] : '\0';
+    bool is_closing_char = false;
+
+    update_syntax_state(syntax_state, c, next_c, line.data,
+                        line.data + col, &is_closing_char);
+
+    if (is_closing_char) {
+      if (c == '*') {
+        syntax_state->in_block_comment = false;
+      } else if (c == '\'') {
+        syntax_state->in_single_quote_string = false;
+      } else if (c == '"') {
+        syntax_state->in_double_quote_string = false;
+      }
+    }
+  }
+
+  // Reset state to beginning of line for rendering
+  SyntaxState line_render_state;
+  compute_syntax_state_up_to_line(window->current_buffer, scroll.vertical + n,
+                                   &line_render_state);
+
+  // Process characters from start of line up to first visible column
+  for (size_t col = 0; col < scroll.horizontal && col < line.length; col++) {
+    char c = line.data[col];
+    char next_c = (col + 1 < line.length) ? line.data[col + 1] : '\0';
+    bool is_closing_char = false;
+
+    update_syntax_state(&line_render_state, c, next_c, line.data,
+                        line.data + col, &is_closing_char);
+
+    if (is_closing_char) {
+      if (c == '*') {
+        line_render_state.in_block_comment = false;
+      } else if (c == '\'') {
+        line_render_state.in_single_quote_string = false;
+      } else if (c == '"') {
+        line_render_state.in_double_quote_string = false;
+      }
+    }
+  }
+
+  bool prev_was_block_comment_star = false;
   for (size_t i = 0; i < window->width; i++) {
     size_t buffer_col = scroll.horizontal + i;
     size_t buffer_row = scroll.vertical + n;
@@ -290,11 +336,11 @@ static void draw_line(Window *window, Line line, size_t n, EditorMode mode,
     bool is_num = false;
 
     if (buffer_col < line.length) {
-      update_syntax_state(&syntax_state, c, next_c, line.data,
+      update_syntax_state(&line_render_state, c, next_c, line.data,
                           line.data + buffer_col, &is_closing_char);
 
       if (is_keyword_char && buffer_col < line.length) {
-        syntax_state.in_keyword = is_keyword_char[buffer_col];
+        line_render_state.in_keyword = is_keyword_char[buffer_col];
       }
       if (is_number_char && buffer_col < line.length) {
         is_num = is_number_char[buffer_col];
@@ -302,6 +348,10 @@ static void draw_line(Window *window, Line line, size_t n, EditorMode mode,
     }
 
     bool needs_reset = false;
+    bool is_tab = (c == '\t');
+    bool in_comment_for_display = line_render_state.in_block_comment ||
+                                   line_render_state.in_line_comment ||
+                                   (prev_was_block_comment_star && c == '/');
 
     if (on_cursor) {
       printf("\x1b[7m");
@@ -309,15 +359,25 @@ static void draw_line(Window *window, Line line, size_t n, EditorMode mode,
     } else if (in_selection) {
       printf("\x1b[48;5;240m");
       needs_reset = true;
+    } else if (is_tab) {
+      printf(COLOR_TAB);
+      needs_reset = true;
+    } else if (in_comment_for_display) {
+      printf(COLOR_COMMENT);
+      needs_reset = true;
     } else {
-      const char *color = get_syntax_color(&syntax_state, is_num);
+      const char *color = get_syntax_color(&line_render_state, is_num);
       if (color) {
         printf("%s", color);
         needs_reset = true;
       }
     }
 
-    putchar(c);
+    if (is_tab) {
+      printf(">>");
+    } else {
+      putchar(c);
+    }
 
     if (needs_reset) {
       printf(COLOR_RESET);
@@ -325,19 +385,22 @@ static void draw_line(Window *window, Line line, size_t n, EditorMode mode,
 
     if (is_closing_char) {
       if (c == '*') {
-        syntax_state.in_block_comment = false;
+        prev_was_block_comment_star = true;
+        line_render_state.in_block_comment = false;
       } else if (c == '\'') {
-        syntax_state.in_single_quote_string = false;
+        line_render_state.in_single_quote_string = false;
       } else if (c == '"') {
-        syntax_state.in_double_quote_string = false;
+        line_render_state.in_double_quote_string = false;
       }
-    }
-
-    if (i == window->width - 1) {
-      syntax_state.in_line_comment = false;
-      syntax_state.in_preprocessor_directive = false;
+    } else {
+      prev_was_block_comment_star = false;
     }
   }
+
+  // End of line - reset line-specific states
+  syntax_state->in_line_comment = false;
+  syntax_state->in_preprocessor_directive = false;
+  syntax_state->in_keyword = false;
 
   if (is_keyword_char) {
     free(is_keyword_char);
@@ -377,14 +440,17 @@ static void update_scroll(Window *window) {
 
 static void draw_window(Window *window, EditorMode mode, Selection *selection) {
   Buffer *current_buffer = window->current_buffer;
+  SyntaxState syntax_state;
+  compute_syntax_state_up_to_line(current_buffer, window->scroll.vertical,
+                                   &syntax_state);
 
   Line eof_line = {.data = "~", .length = 1};
   for (size_t i = 0; i < window->height; i++) {
     size_t buffer_row = window->scroll.vertical + i;
     if (buffer_row < current_buffer->length) {
-      draw_line(window, current_buffer->lines[buffer_row], i, mode, selection);
+      draw_line(window, current_buffer->lines[buffer_row], i, mode, selection, &syntax_state);
     } else {
-      draw_line(window, eof_line, i, mode, selection);
+      draw_line(window, eof_line, i, mode, selection, &syntax_state);
     }
   }
   fflush(stdout);
@@ -399,6 +465,9 @@ static void draw_window_with_line_numbers(Window *window, EditorMode mode,
   }
 
   Buffer *current_buffer = window->current_buffer;
+  SyntaxState syntax_state;
+  compute_syntax_state_up_to_line(current_buffer, window->scroll.vertical,
+                                   &syntax_state);
   size_t num_digits = snprintf(NULL, 0, "%zu", current_buffer->length);
   if (num_digits < 3)
     num_digits = 3;
@@ -415,10 +484,10 @@ static void draw_window_with_line_numbers(Window *window, EditorMode mode,
 
     if (buffer_row < current_buffer->length) {
       printf("\033[38;5;242m%*zu \033[0m", (int)num_digits, buffer_row + 1);
-      draw_line(window, current_buffer->lines[buffer_row], i, mode, selection);
+      draw_line(window, current_buffer->lines[buffer_row], i, mode, selection, &syntax_state);
     } else {
       printf("\033[38;5;242m%*s \033[0m", (int)num_digits, "~");
-      draw_line(window, eof_line, i, mode, selection);
+      draw_line(window, eof_line, i, mode, selection, &syntax_state);
     }
   }
 
