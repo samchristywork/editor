@@ -365,8 +365,23 @@ void handle_insert_mode(Context *ctx, unsigned char c) {
   EditorMode *mode = &ctx->mode;
 
   switch (c) {
-  case 27:
+  case 27: {
+    unsigned char next;
+    if (read(STDIN_FILENO, &next, 1) == 1) {
+      if (next == '[') {
+        unsigned char seq;
+        if (read(STDIN_FILENO, &seq, 1) == 1 && seq == 'Z') {
+          insert_char(window, '\t');
+          break;
+        }
+      }
+    }
     *mode = MODE_NORMAL;
+    break;
+  }
+  case '\t':
+    insert_char(window, ' ');
+    insert_char(window, ' ');
     break;
   case 127:
   case 8:
