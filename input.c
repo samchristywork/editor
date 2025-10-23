@@ -1,129 +1,16 @@
-#include <ctype.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include <sys/select.h>
+#include <sys/time.h>
 #include <unistd.h>
 
 #include "draw.h"
-#include "edit.h"
 #include "input.h"
+#include "main.h"
+#include "mode_handlers.h"
 
 #define MILLISECONDS 1000
 
-typedef enum { SEARCH_FORWARD, SEARCH_BACKWARD } SearchDirection;
-
-static bool find_occurrence(Window *window, const char *search_str,
-                            size_t search_len, SearchDirection direction) {
-  if (search_len == 0) {
-    return false;
-  }
-
-  Buffer *buffer = window->current_buffer;
-  size_t start_row = window->cursor.row - 1;
-
-  if (direction == SEARCH_FORWARD) {
-    size_t start_col = window->cursor.column;
-
-    for (size_t row = start_row; row < buffer->length; row++) {
-      Line *line = &buffer->lines[row];
-      size_t col_start = (row == start_row) ? start_col : 0;
-
-      for (size_t col = col_start; col < line->length; col++) {
-        if (col + search_len <= line->length &&
-            strncmp(&line->data[col], search_str, search_len) == 0) {
-          window->cursor.row = row + 1;
-          window->cursor.column = col + 1;
-          return true;
-        }
-      }
-    }
-
-    for (size_t row = 0; row < start_row; row++) {
-      Line *line = &buffer->lines[row];
-      for (size_t col = 0; col < line->length; col++) {
-        if (col + search_len <= line->length &&
-            strncmp(&line->data[col], search_str, search_len) == 0) {
-          window->cursor.row = row + 1;
-          window->cursor.column = col + 1;
-          return true;
-        }
-      }
-    }
-  } else {
-    size_t start_col = window->cursor.column - 2;
-
-    if (start_row >= buffer->length) {
-      start_row = buffer->length - 1;
-    }
-
-    for (size_t row = start_row + 1; row > 0; row--) {
-      size_t r = row - 1;
-      Line *line = &buffer->lines[r];
-      size_t col_end = (r == start_row) ? start_col : line->length;
-
-      if (col_end > line->length) {
-        col_end = line->length;
-      }
-
-      for (size_t col = col_end + 1; col > 0; col--) {
-        size_t c = col - 1;
-        if (c + search_len <= line->length &&
-            strncmp(&line->data[c], search_str, search_len) == 0) {
-          window->cursor.row = r + 1;
-          window->cursor.column = c + 1;
-          return true;
-        }
-      }
-    }
-
-    for (size_t row = buffer->length; row > start_row + 1; row--) {
-      size_t r = row - 1;
-      Line *line = &buffer->lines[r];
-      for (size_t col = line->length; col > 0; col--) {
-        size_t c = col - 1;
-        if (c + search_len <= line->length &&
-            strncmp(&line->data[c], search_str, search_len) == 0) {
-          window->cursor.row = r + 1;
-          window->cursor.column = c + 1;
-          return true;
-        }
-      }
-    }
-  }
-
-  return false;
-}
-
-static void save_buffer(Buffer *buffer) {
-  if (buffer == NULL || buffer->file.name == NULL) {
-    return;
-  }
-
-  FILE *f = fopen(buffer->file.name, "w");
-  if (f == NULL) {
-    return;
-  }
-
-  for (size_t i = 0; i < buffer->length; i++) {
-    if (buffer->lines[i].length > 0) {
-      fwrite(buffer->lines[i].data, 1, buffer->lines[i].length, f);
-    }
-    if (i < buffer->length) {
-      fputc('\n', f);
-    }
-  }
-
-  fclose(f);
-}
-
 void handle_input(Context *ctx) {
   Window *window = ctx->windows[ctx->current_window];
-  bool *running = &ctx->running;
-  EditorMode *mode = &ctx->mode;
-  char **command_buffer = &ctx->command_buffer;
-  size_t *command_buffer_length = &ctx->command_buffer_length;
-  char **search_buffer = &ctx->search_buffer;
-  size_t *search_buffer_length = &ctx->search_buffer_length;
   size_t width = ctx->terminal.width;
   size_t height = ctx->terminal.height;
 
@@ -137,83 +24,22 @@ void handle_input(Context *ctx) {
   if (select(STDIN_FILENO + 1, &readfds, NULL, NULL, &tv) > 0) {
     unsigned char c;
     if (read(STDIN_FILENO, &c, 1) == 1) {
-      if (*mode == MODE_NORMAL) {
-        switch (c) {
-        case 'h':
-          window->cursor.column--;
-          break;
-        case 'j':
-          window->cursor.row++;
-          break;
-        case 'k':
-          window->cursor.row--;
-          break;
-        case 'l':
-          window->cursor.column++;
-          break;
-        case 4:
-          window->cursor.row += window->height / 2;
-          break;
-        case 21:
-          if (window->cursor.row < window->height / 2) {
-            window->cursor.row = 0;
-          } else {
-            window->cursor.row -= window->height / 2;
-          }
-          break;
-        case 'g':
-          if (read(STDIN_FILENO, &c, 1) == 1) {
-            if (c == 'g') {
-              window->cursor.row = 1;
-            }
-          }
-          break;
-        case 'G':
-          window->cursor.row = window->current_buffer->length;
-          break;
-        case 'x':
-          push_undo_state(ctx);
-          delete_char(window);
-          break;
-        case 'd':
-          if (read(STDIN_FILENO, &c, 1) == 1) {
-            if (c == 'd') {
-              push_undo_state(ctx);
-              delete_line(window);
-            } else if (c == 'w') {
-              push_undo_state(ctx);
-              delete_word(window);
-            }
-          }
-          break;
-        case 'i':
-          *mode = MODE_INSERT;
-          break;
-        case 'q':
-          *running = false;
-          break;
-        }
-      } else if (*mode == MODE_INSERT) {
-        switch (c) {
-        case 27:
-          *mode = MODE_NORMAL;
-          break;
-        case 127:
-        case 8:
-          backspace_char(window);
-          break;
-        case '\r':
-        case '\n':
-          insert_newline(window);
-          break;
-        default:
-          if (c >= 32 && c <= 126) {
-            insert_char(window, c);
-          }
-          break;
-        }
+      if (ctx->mode == MODE_NORMAL) {
+        handle_normal_mode(ctx, c);
+      } else if (ctx->mode == MODE_COMMAND) {
+        handle_command_mode(ctx, c);
+      } else if (ctx->mode == MODE_SEARCH) {
+        handle_search_mode(ctx, c);
+      } else if (ctx->mode == MODE_INSERT) {
+        handle_insert_mode(ctx, c);
+      } else if (ctx->mode == MODE_LINEWISE_VISUAL ||
+                 ctx->mode == MODE_CHARACTERWISE_VISUAL) {
+        handle_visual_mode(ctx, c);
       }
-      draw_screen(window, width, height);
+      draw_screen(window, width, height, ctx->mode, &ctx->selection,
+                  ctx->command_buffer, ctx->command_buffer_length,
+                  ctx->search_buffer, ctx->search_buffer_length,
+                  ctx->show_line_numbers);
     }
   }
 }
