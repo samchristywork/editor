@@ -119,7 +119,7 @@ static void set_cursor_position(size_t row, size_t column) {
 static void draw_status_bar(size_t width, size_t height, Cursor cursor,
                             EditorMode mode, char *command_buffer,
                             size_t command_buffer_length, char *search_buffer,
-                            size_t search_buffer_length) {
+                            size_t search_buffer_length, const char *filename) {
   set_cursor_position(height, 1);
   printf("\x1b[7m");
   char status_bar_text[256];
@@ -130,13 +130,14 @@ static void draw_status_bar(size_t width, size_t height, Cursor cursor,
     snprintf(status_bar_text, 256, "/%.*s", (int)search_buffer_length,
              search_buffer ? search_buffer : "");
   } else if (mode == MODE_LINEWISE_VISUAL) {
-    snprintf(status_bar_text, 256, "-- VISUAL LINE -- %zu %zu", cursor.row,
-             cursor.column);
+    snprintf(status_bar_text, 256, "%s -- VISUAL LINE -- %zu %zu",
+             filename ? filename : "[No Name]", cursor.row, cursor.column);
   } else if (mode == MODE_CHARACTERWISE_VISUAL) {
-    snprintf(status_bar_text, 256, "-- VISUAL -- %zu %zu", cursor.row,
-             cursor.column);
+    snprintf(status_bar_text, 256, "%s -- VISUAL -- %zu %zu",
+             filename ? filename : "[No Name]", cursor.row, cursor.column);
   } else {
-    snprintf(status_bar_text, 256, "%zu %zu", cursor.row, cursor.column);
+    snprintf(status_bar_text, 256, "%s %zu %zu",
+             filename ? filename : "[No Name]", cursor.row, cursor.column);
   }
   size_t len = strlen(status_bar_text);
   for (size_t i = 0; i < width; i++) {
@@ -358,17 +359,54 @@ static void draw_window(Window *window, EditorMode mode, Selection *selection) {
   fflush(stdout);
 }
 
+static void draw_window_with_line_numbers(Window *window, EditorMode mode,
+                                          Selection *selection,
+                                          bool show_line_numbers) {
+  if (!show_line_numbers) {
+    draw_window(window, mode, selection);
+    return;
+  }
+
+  Buffer *current_buffer = window->current_buffer;
+  size_t num_digits = snprintf(NULL, 0, "%zu", current_buffer->length);
+  if (num_digits < 3)
+    num_digits = 3;
+
+  size_t line_num_width = num_digits + 1;
+  size_t saved_column = window->column;
+  window->column += line_num_width;
+
+  Line eof_line = {.data = "~", .length = 1};
+  for (size_t i = 0; i < window->height; i++) {
+    size_t buffer_row = window->scroll.vertical + i;
+
+    printf("\033[%zu;1H", window->row + i);
+
+    if (buffer_row < current_buffer->length) {
+      printf("\033[38;5;242m%*zu \033[0m", (int)num_digits, buffer_row + 1);
+      draw_line(window, current_buffer->lines[buffer_row], i, mode, selection);
+    } else {
+      printf("\033[38;5;242m%*s \033[0m", (int)num_digits, "~");
+      draw_line(window, eof_line, i, mode, selection);
+    }
+  }
+
+  window->column = saved_column;
+  fflush(stdout);
+}
+
 void draw_screen(Window *window, size_t width, size_t height, EditorMode mode,
                  Selection *selection, char *command_buffer,
                  size_t command_buffer_length, char *search_buffer,
-                 size_t search_buffer_length) {
+                 size_t search_buffer_length, bool show_line_numbers) {
   constrain_cursor(window);
   window->row = 1;
   window->column = 1;
   window->width = width;
   window->height = height - 1;
   update_scroll(window);
+  draw_window_with_line_numbers(window, mode, selection, show_line_numbers);
   draw_status_bar(width, height, window->cursor, mode, command_buffer,
-                  command_buffer_length, search_buffer, search_buffer_length);
-  draw_window(window, mode, selection);
+                  command_buffer_length, search_buffer, search_buffer_length,
+                  window->current_buffer->file.name);
 }
