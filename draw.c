@@ -12,6 +12,7 @@
 #define COLOR_COMMENT "\x1b[90m"
 #define COLOR_PREPROCESSOR "\x1b[36m"
 #define COLOR_NUMBER "\x1b[31m"
+#define COLOR_TAB "\x1b[34m"
 #define COLOR_RESET "\x1b[0m"
 
 static const char *keywords[] = {
@@ -189,13 +190,43 @@ static bool is_in_selection(size_t row, size_t col, EditorMode mode,
   }
 }
 
+static void compute_syntax_state_up_to_line(Buffer *buffer, size_t target_line,
+                                             SyntaxState *state) {
+  *state = (SyntaxState){0};
+
+  for (size_t row = 0; row < target_line && row < buffer->length; row++) {
+    Line *line = &buffer->lines[row];
+
+    for (size_t col = 0; col < line->length; col++) {
+      char c = line->data[col];
+      char next_c = (col + 1 < line->length) ? line->data[col + 1] : '\0';
+      bool is_closing_char = false;
+
+      update_syntax_state(state, c, next_c, line->data, line->data + col,
+                          &is_closing_char);
+
+      if (is_closing_char) {
+        if (c == '*') {
+          state->in_block_comment = false;
+        } else if (c == '\'') {
+          state->in_single_quote_string = false;
+        } else if (c == '"') {
+          state->in_double_quote_string = false;
+        }
+      }
+    }
+
+    state->in_line_comment = false;
+    state->in_preprocessor_directive = false;
+    state->in_keyword = false;
+  }
+}
+
 static void draw_line(Window *window, Line line, size_t n, EditorMode mode,
-                      Selection *selection) {
+                      Selection *selection, SyntaxState *syntax_state) {
   Cursor cursor = window->cursor;
   Scroll scroll = window->scroll;
   set_cursor_position(window->row + n, window->column);
-
-  SyntaxState syntax_state = {0};
 
   bool *is_keyword_char = calloc(line.length, sizeof(bool));
   bool *is_number_char = calloc(line.length, sizeof(bool));
