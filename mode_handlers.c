@@ -420,6 +420,16 @@ void handle_visual_mode(Context *ctx, unsigned char c) {
   case 'l':
     window->cursor.column++;
     break;
+  case 'g':
+    if (read(STDIN_FILENO, &c, 1) == 1) {
+      if (c == 'g') {
+        window->cursor.row = 1;
+      }
+    }
+    break;
+  case 'G':
+    window->cursor.row = window->current_buffer->length;
+    break;
   case 'y':
     yank_selection(ctx);
     *mode = MODE_NORMAL;
