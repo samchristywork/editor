@@ -35,5 +35,27 @@ tsan: clean
 	gcc -fsanitize=thread -g *.c -o build/editor
 	TSAN_OPTIONS=log_path=log/tsan.log ./build/editor LICENSE || true
 
+gprof: clean
+	mkdir -p build log
+	gcc -pg -g -Wall -Wextra *.c -o build/editor
+	./build/editor
+	gprof build/editor gmon.out > log/gprof.txt
+
+gcov: clean
+	mkdir -p build log
+	gcc --coverage -g -Wall -Wextra *.c -o build/editor
+	./build/editor
+	gcov *.c > log/gcov.txt
+
+analyze: clean all
+	make cppcheck
+	make clang-tidy
+	make valgrind
+	make asan
+	make ubsan
+	make tsan
+	make gprof
+	make gcov
+
 clean:
 	rm -rf build
