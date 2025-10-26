@@ -96,6 +96,7 @@ typedef struct {
   size_t yank_buffer_length;
   bool yank_linewise;
   UndoStack undo_stack;
+  bool show_line_numbers;
 } Context;
 
 typedef struct {
