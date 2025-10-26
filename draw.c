@@ -15,6 +15,42 @@
 #define COLOR_TAB "\x1b[34m"
 #define COLOR_RESET "\x1b[0m"
 
+typedef struct {
+  char *data;
+  size_t length;
+  size_t capacity;
+} DrawBuffer;
+
+static void draw_buffer_init(DrawBuffer *buf, size_t initial_capacity) {
+  buf->data = malloc(initial_capacity);
+  buf->length = 0;
+  buf->capacity = initial_capacity;
+}
+
+static void draw_buffer_append(DrawBuffer *buf, const char *str, size_t len) {
+  while (buf->length + len >= buf->capacity) {
+    buf->capacity *= 2;
+    buf->data = realloc(buf->data, buf->capacity);
+  }
+  memcpy(buf->data + buf->length, str, len);
+  buf->length += len;
+}
+
+static void draw_buffer_append_str(DrawBuffer *buf, const char *str) {
+  draw_buffer_append(buf, str, strlen(str));
+}
+
+static void draw_buffer_append_char(DrawBuffer *buf, char c) {
+  draw_buffer_append(buf, &c, 1);
+}
+
+static void draw_buffer_free(DrawBuffer *buf) {
+  free(buf->data);
+  buf->data = NULL;
+  buf->length = 0;
+  buf->capacity = 0;
+}
+
 static const char *keywords[] = {
     "auto",     "break",  "case",    "char",   "const",    "continue",
     "default",  "do",     "double",  "else",   "enum",     "extern",
@@ -113,16 +149,18 @@ static const char *get_syntax_color(SyntaxState *state, bool is_num) {
   return NULL;
 }
 
-static void set_cursor_position(size_t row, size_t column) {
-  printf("\x1b[%zu;%zuH", row, column);
+static void set_cursor_position(DrawBuffer *buf, size_t row, size_t column) {
+  char pos[32];
+  int len = snprintf(pos, sizeof(pos), "\x1b[%zu;%zuH", row, column);
+  draw_buffer_append(buf, pos, len);
 }
 
-static void draw_status_bar(size_t width, size_t height, Cursor cursor,
-                            EditorMode mode, char *command_buffer,
+static void draw_status_bar(DrawBuffer *buf, size_t width, size_t height,
+                            Cursor cursor, EditorMode mode, char *command_buffer,
                             size_t command_buffer_length, char *search_buffer,
                             size_t search_buffer_length, const char *filename) {
-  set_cursor_position(height, 1);
-  printf("\x1b[7m");
+  set_cursor_position(buf, height, 1);
+  draw_buffer_append_str(buf, "\x1b[7m");
   char status_bar_text[256];
   if (mode == MODE_COMMAND) {
     snprintf(status_bar_text, 256, ":%.*s", (int)command_buffer_length,
@@ -143,13 +181,12 @@ static void draw_status_bar(size_t width, size_t height, Cursor cursor,
   size_t len = strlen(status_bar_text);
   for (size_t i = 0; i < width; i++) {
     if (i < len) {
-      putchar(status_bar_text[i]);
+      draw_buffer_append_char(buf, status_bar_text[i]);
     } else {
-      putchar(' ');
+      draw_buffer_append_char(buf, ' ');
     }
   }
-  printf("\x1b[0m");
-  fflush(stdout);
+  draw_buffer_append_str(buf, "\x1b[0m");
 }
 
 static bool is_in_selection(size_t row, size_t col, EditorMode mode,
@@ -222,11 +259,12 @@ static void compute_syntax_state_up_to_line(Buffer *buffer, size_t target_line,
   }
 }
 
-static void draw_line(Window *window, Line line, size_t n, EditorMode mode,
-                      Selection *selection, SyntaxState *syntax_state) {
+static void draw_line(DrawBuffer *buf, Window *window, Line line, size_t n,
+                      EditorMode mode, Selection *selection,
+                      SyntaxState *syntax_state) {
   Cursor cursor = window->cursor;
   Scroll scroll = window->scroll;
-  set_cursor_position(window->row + n, window->column);
+  set_cursor_position(buf, window->row + n, window->column);
 
   bool *is_keyword_char = calloc(line.length, sizeof(bool));
   bool *is_number_char = calloc(line.length, sizeof(bool));
@@ -351,30 +389,30 @@ static void draw_line(Window *window, Line line, size_t n, EditorMode mode,
                                    (prev_was_block_comment_star && c == '/');
 
     if (in_selection) {
-      printf("\x1b[48;5;240m");
+      draw_buffer_append_str(buf, "\x1b[48;5;240m");
       needs_reset = true;
     } else if (is_tab) {
-      printf(COLOR_TAB);
+      draw_buffer_append_str(buf, COLOR_TAB);
       needs_reset = true;
     } else if (in_comment_for_display) {
-      printf(COLOR_COMMENT);
+      draw_buffer_append_str(buf, COLOR_COMMENT);
       needs_reset = true;
     } else {
       const char *color = get_syntax_color(&line_render_state, is_num);
       if (color) {
-        printf("%s", color);
+        draw_buffer_append_str(buf, color);
         needs_reset = true;
       }
     }
 
     if (is_tab) {
-      printf(">>");
+      draw_buffer_append_str(buf, ">>");
     } else {
-      putchar(c);
+      draw_buffer_append_char(buf, c);
     }
 
     if (needs_reset) {
-      printf(COLOR_RESET);
+      draw_buffer_append_str(buf, COLOR_RESET);
     }
 
     if (is_closing_char) {
@@ -431,7 +469,8 @@ static void update_scroll(Window *window) {
   }
 }
 
-static void draw_window(Window *window, EditorMode mode, Selection *selection) {
+static void draw_window(DrawBuffer *buf, Window *window, EditorMode mode,
+                        Selection *selection) {
   Buffer *current_buffer = window->current_buffer;
   SyntaxState syntax_state;
   compute_syntax_state_up_to_line(current_buffer, window->scroll.vertical,
@@ -441,19 +480,19 @@ static void draw_window(Window *window, EditorMode mode, Selection *selection) {
   for (size_t i = 0; i < window->height; i++) {
     size_t buffer_row = window->scroll.vertical + i;
     if (buffer_row < current_buffer->length) {
-      draw_line(window, current_buffer->lines[buffer_row], i, mode, selection, &syntax_state);
+      draw_line(buf, window, current_buffer->lines[buffer_row], i, mode,
+                selection, &syntax_state);
     } else {
-      draw_line(window, eof_line, i, mode, selection, &syntax_state);
+      draw_line(buf, window, eof_line, i, mode, selection, &syntax_state);
     }
   }
-  fflush(stdout);
 }
 
-static void draw_window_with_line_numbers(Window *window, EditorMode mode,
-                                          Selection *selection,
+static void draw_window_with_line_numbers(DrawBuffer *buf, Window *window,
+                                          EditorMode mode, Selection *selection,
                                           bool show_line_numbers) {
   if (!show_line_numbers) {
-    draw_window(window, mode, selection);
+    draw_window(buf, window, mode, selection);
     return;
   }
 
@@ -473,26 +512,33 @@ static void draw_window_with_line_numbers(Window *window, EditorMode mode,
   for (size_t i = 0; i < window->height; i++) {
     size_t buffer_row = window->scroll.vertical + i;
 
-    printf("\033[%zu;1H", window->row + i);
+    char line_num[32];
+    int len = snprintf(line_num, sizeof(line_num), "\033[%zu;1H", window->row + i);
+    draw_buffer_append(buf, line_num, len);
 
     if (buffer_row < current_buffer->length) {
-      printf("\033[38;5;242m%*zu \033[0m", (int)num_digits, buffer_row + 1);
-      draw_line(window, current_buffer->lines[buffer_row], i, mode, selection, &syntax_state);
+      len = snprintf(line_num, sizeof(line_num), "\033[38;5;242m%*zu \033[0m",
+                     (int)num_digits, buffer_row + 1);
+      draw_buffer_append(buf, line_num, len);
+      draw_line(buf, window, current_buffer->lines[buffer_row], i, mode,
+                selection, &syntax_state);
     } else {
-      printf("\033[38;5;242m%*s \033[0m", (int)num_digits, "~");
-      draw_line(window, eof_line, i, mode, selection, &syntax_state);
+      len = snprintf(line_num, sizeof(line_num), "\033[38;5;242m%*s \033[0m",
+                     (int)num_digits, "~");
+      draw_buffer_append(buf, line_num, len);
+      draw_line(buf, window, eof_line, i, mode, selection, &syntax_state);
     }
   }
 
   window->column = saved_column;
-  fflush(stdout);
 }
 
 void draw_screen(Window *window, size_t width, size_t height, EditorMode mode,
                  Selection *selection, char *command_buffer,
                  size_t command_buffer_length, char *search_buffer,
                  size_t search_buffer_length, bool show_line_numbers) {
-  printf("\x1b[?25l");
+  DrawBuffer buf;
+  draw_buffer_init(&buf, 65536);
 
   constrain_cursor(window);
   window->row = 1;
@@ -500,8 +546,9 @@ void draw_screen(Window *window, size_t width, size_t height, EditorMode mode,
   window->width = width;
   window->height = height - 1;
   update_scroll(window);
-  draw_window_with_line_numbers(window, mode, selection, show_line_numbers);
-  draw_status_bar(width, height, window->cursor, mode, command_buffer,
+
+  draw_window_with_line_numbers(&buf, window, mode, selection, show_line_numbers);
+  draw_status_bar(&buf, width, height, window->cursor, mode, command_buffer,
                   command_buffer_length, search_buffer, search_buffer_length,
                   window->current_buffer->file.name);
 
@@ -515,15 +562,16 @@ void draw_screen(Window *window, size_t width, size_t height, EditorMode mode,
     screen_col += num_digits + 1;
   }
 
-  set_cursor_position(screen_row, screen_col);
+  set_cursor_position(&buf, screen_row, screen_col);
 
   if (mode == MODE_INSERT) {
-    printf("\x1b[6 q");
+    draw_buffer_append_str(&buf, "\x1b[6 q");
   } else {
-    printf("\x1b[2 q");
+    draw_buffer_append_str(&buf, "\x1b[2 q");
   }
 
-  printf("\x1b[?25h");
-
+  fwrite(buf.data, 1, buf.length, stdout);
   fflush(stdout);
+
+  draw_buffer_free(&buf);
 }
