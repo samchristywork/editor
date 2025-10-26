@@ -274,7 +274,6 @@ static void draw_line(Window *window, Line line, size_t n, EditorMode mode,
     }
   }
 
-  // First, process the entire line to update syntax state correctly
   for (size_t col = 0; col < line.length; col++) {
     char c = line.data[col];
     char next_c = (col + 1 < line.length) ? line.data[col + 1] : '\0';
@@ -294,12 +293,10 @@ static void draw_line(Window *window, Line line, size_t n, EditorMode mode,
     }
   }
 
-  // Reset state to beginning of line for rendering
   SyntaxState line_render_state;
   compute_syntax_state_up_to_line(window->current_buffer, scroll.vertical + n,
                                    &line_render_state);
 
-  // Process characters from start of line up to first visible column
   for (size_t col = 0; col < scroll.horizontal && col < line.length; col++) {
     char c = line.data[col];
     char next_c = (col + 1 < line.length) ? line.data[col + 1] : '\0';
@@ -353,10 +350,7 @@ static void draw_line(Window *window, Line line, size_t n, EditorMode mode,
                                    line_render_state.in_line_comment ||
                                    (prev_was_block_comment_star && c == '/');
 
-    if (on_cursor) {
-      printf("\x1b[7m");
-      needs_reset = true;
-    } else if (in_selection) {
+    if (in_selection) {
       printf("\x1b[48;5;240m");
       needs_reset = true;
     } else if (is_tab) {
@@ -397,7 +391,6 @@ static void draw_line(Window *window, Line line, size_t n, EditorMode mode,
     }
   }
 
-  // End of line - reset line-specific states
   syntax_state->in_line_comment = false;
   syntax_state->in_preprocessor_directive = false;
   syntax_state->in_keyword = false;
@@ -509,4 +502,24 @@ void draw_screen(Window *window, size_t width, size_t height, EditorMode mode,
   draw_status_bar(width, height, window->cursor, mode, command_buffer,
                   command_buffer_length, search_buffer, search_buffer_length,
                   window->current_buffer->file.name);
+
+  size_t screen_row = window->cursor.row - window->scroll.vertical;
+  size_t screen_col = window->cursor.column - window->scroll.horizontal;
+
+  if (show_line_numbers) {
+    size_t num_digits = snprintf(NULL, 0, "%zu", window->current_buffer->length);
+    if (num_digits < 3)
+      num_digits = 3;
+    screen_col += num_digits + 1;
+  }
+
+  set_cursor_position(screen_row, screen_col);
+
+  if (mode == MODE_INSERT) {
+    printf("\x1b[6 q");
+  } else {
+    printf("\x1b[2 q");
+  }
+
+  fflush(stdout);
 }

@@ -20,7 +20,7 @@ static void enter_alt_screen(void) {
   raw.c_cc[VTIME] = 0;
   tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
   printf("\x1b[?1049h");
-  printf("\x1b[?25l");
+  printf("\x1b[?25h");
   printf("\x1b[2J");
   printf("\x1b[H");
   fflush(stdout);
