@@ -492,6 +492,8 @@ void draw_screen(Window *window, size_t width, size_t height, EditorMode mode,
                  Selection *selection, char *command_buffer,
                  size_t command_buffer_length, char *search_buffer,
                  size_t search_buffer_length, bool show_line_numbers) {
+  printf("\x1b[?25l");
+
   constrain_cursor(window);
   window->row = 1;
   window->column = 1;
@@ -520,6 +522,8 @@ void draw_screen(Window *window, size_t width, size_t height, EditorMode mode,
   } else {
     printf("\x1b[2 q");
   }
+
+  printf("\x1b[?25h");
 
   fflush(stdout);
 }
