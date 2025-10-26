@@ -33,6 +33,14 @@ void handle_normal_mode(Context *ctx, unsigned char c) {
   case 'l':
     window->cursor.column++;
     break;
+  case '0':
+    window->cursor.column = 1;
+    break;
+  case '$': {
+    Line *line_ptr = &window->current_buffer->lines[window->cursor.row - 1];
+    window->cursor.column = line_ptr->length + 1;
+    break;
+  }
   case 4:
     window->cursor.row += window->height / 2;
     break;
@@ -420,6 +428,14 @@ void handle_visual_mode(Context *ctx, unsigned char c) {
   case 'l':
     window->cursor.column++;
     break;
+  case '0':
+    window->cursor.column = 1;
+    break;
+  case '$': {
+    Line *line_ptr = &window->current_buffer->lines[window->cursor.row - 1];
+    window->cursor.column = line_ptr->length + 1;
+    break;
+  }
   case 'g':
     if (read(STDIN_FILENO, &c, 1) == 1) {
       if (c == 'g') {
