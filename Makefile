@@ -1,8 +1,8 @@
 all: build/editor
 
-build/editor: *.c
+build/editor: src/*.c src/*.h
 	mkdir -p build
-	gcc -g -Wpedantic -Wall -Wextra *.c -o build/editor
+	gcc -g -Wpedantic -Wall -Wextra src/*.c -o build/editor
 
 run: all
 	./build/editor
@@ -13,7 +13,7 @@ cppcheck:
 
 clang-tidy:
 	mkdir -p log
-	clang-tidy *.c -- -I. > log/clang-tidy.log 2>&1
+	clang-tidy src/* -- -I. > log/clang-tidy.log 2>&1
 
 valgrind: all
 	mkdir -p log
@@ -22,30 +22,30 @@ valgrind: all
 
 asan: clean
 	mkdir -p build log
-	gcc -fsanitize=address -g *.c -o build/editor
+	gcc -fsanitize=address -g src/*.c -o build/editor
 	ASAN_OPTIONS=log_path=log/asan.log ./build/editor LICENSE || true
 
 ubsan: clean
 	mkdir -p build log
-	gcc -fsanitize=undefined -g *.c -o build/editor
+	gcc -fsanitize=undefined -g src/*.c -o build/editor
 	UBSAN_OPTIONS=log_path=log/ubsan.log ./build/editor LICENSE || true
 
 tsan: clean
 	mkdir -p build log
-	gcc -fsanitize=thread -g *.c -o build/editor
+	gcc -fsanitize=thread -g src/*.c -o build/editor
 	TSAN_OPTIONS=log_path=log/tsan.log ./build/editor LICENSE || true
 
 gprof: clean
 	mkdir -p build log
-	gcc -pg -g -Wall -Wextra *.c -o build/editor
+	gcc -pg -g -Wall -Wextra src/*.c -o build/editor
 	./build/editor
 	gprof build/editor gmon.out > log/gprof.txt
 
 gcov: clean
 	mkdir -p build log
-	gcc --coverage -g -Wall -Wextra *.c -o build/editor
+	gcc --coverage -g -Wall -Wextra src/*.c -o build/editor
 	./build/editor
-	gcov *.c > log/gcov.txt
+	gcov src/*.c > log/gcov.txt
 
 analyze: clean all
 	make cppcheck
