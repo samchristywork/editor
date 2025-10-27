@@ -2,7 +2,7 @@ all: build/editor
 
 build/editor: *.c
 	mkdir -p build
-	gcc -g -Wall -Wextra *.c -o build/editor
+	gcc -g -Wpedantic -Wall -Wextra *.c -o build/editor
 
 run: all
 	./build/editor

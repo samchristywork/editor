@@ -262,7 +262,6 @@ static void compute_syntax_state_up_to_line(Buffer *buffer, size_t target_line,
 static void draw_line(DrawBuffer *buf, Window *window, Line line, size_t n,
                       EditorMode mode, Selection *selection,
                       SyntaxState *syntax_state) {
-  Cursor cursor = window->cursor;
   Scroll scroll = window->scroll;
   set_cursor_position(buf, window->row + n, window->column);
 
@@ -358,8 +357,6 @@ static void draw_line(DrawBuffer *buf, Window *window, Line line, size_t n,
   for (size_t i = 0; i < window->width; i++) {
     size_t buffer_col = scroll.horizontal + i;
     size_t buffer_row = scroll.vertical + n;
-    bool on_cursor =
-        cursor.row - 1 == buffer_row && cursor.column - 1 == buffer_col;
     bool in_selection =
         is_in_selection(buffer_row + 1, buffer_col + 1, mode, selection);
 
@@ -476,7 +473,7 @@ static void draw_window(DrawBuffer *buf, Window *window, EditorMode mode,
   compute_syntax_state_up_to_line(current_buffer, window->scroll.vertical,
                                    &syntax_state);
 
-  Line eof_line = {.data = "~", .length = 1};
+  Line eof_line = {.data = "", .length = 0};
   for (size_t i = 0; i < window->height; i++) {
     size_t buffer_row = window->scroll.vertical + i;
     if (buffer_row < current_buffer->length) {
@@ -508,7 +505,7 @@ static void draw_window_with_line_numbers(DrawBuffer *buf, Window *window,
   size_t saved_column = window->column;
   window->column += line_num_width;
 
-  Line eof_line = {.data = "~", .length = 1};
+  Line eof_line = {.data = "", .length = 0};
   for (size_t i = 0; i < window->height; i++) {
     size_t buffer_row = window->scroll.vertical + i;
 
