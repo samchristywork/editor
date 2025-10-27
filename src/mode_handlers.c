@@ -65,9 +65,11 @@ void handle_normal_mode(Context *ctx, unsigned char c) {
     push_undo_state(ctx);
     Line *line_ptr = &window->current_buffer->lines[window->cursor.row - 1];
     size_t leading_spaces = 0;
-    for (; leading_spaces < line_ptr->length; leading_spaces++) {
-      if (line_ptr->data[leading_spaces] != ' ') {
-        break;
+    if (line_ptr->data != NULL) {
+      for (; leading_spaces < line_ptr->length; leading_spaces++) {
+        if (line_ptr->data[leading_spaces] != ' ') {
+          break;
+        }
       }
     }
     window->cursor.column = line_ptr->length + 1;
@@ -134,10 +136,14 @@ void handle_normal_mode(Context *ctx, unsigned char c) {
   case 'I': {
     push_undo_state(ctx);
     Line *line_ptr = &window->current_buffer->lines[window->cursor.row - 1];
-    for (window->cursor.column = 0;
-         line_ptr->data[window->cursor.column] == ' ' &&
-         window->cursor.column < line_ptr->length;
-         window->cursor.column++) {
+    if (line_ptr->data != NULL) {
+      for (window->cursor.column = 0;
+           line_ptr->data[window->cursor.column] == ' ' &&
+           window->cursor.column < line_ptr->length;
+           window->cursor.column++) {
+      }
+    } else {
+      window->cursor.column = 0;
     }
     window->cursor.column++;
     *mode = MODE_INSERT;
