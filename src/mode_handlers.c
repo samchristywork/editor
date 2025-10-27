@@ -215,6 +215,75 @@ void handle_normal_mode(Context *ctx, unsigned char c) {
   }
 }
 
+static void execute_command(Context *ctx) {
+  Window *window = ctx->windows[ctx->current_window];
+  char *command_buffer = ctx->command_buffer;
+  size_t command_buffer_length = ctx->command_buffer_length;
+
+  if (command_buffer_length == 1 && command_buffer[0] == 'w') {
+    save_buffer(window->current_buffer);
+  } else if (command_buffer_length == 1 && command_buffer[0] == 'q') {
+    ctx->running = false;
+  } else if (command_buffer_length == 1 && command_buffer[0] == 'x') {
+    save_buffer(window->current_buffer);
+    ctx->running = false;
+  } else if (command_buffer_length == 2 &&
+             strncmp(command_buffer, "bn", 2) == 0) {
+    size_t current_idx = 0;
+    for (size_t i = 0; i < ctx->n_buffers; i++) {
+      if (ctx->buffers[i] == window->current_buffer) {
+        current_idx = i;
+        break;
+      }
+    }
+    size_t next_idx = (current_idx + 1) % ctx->n_buffers;
+    window->current_buffer = ctx->buffers[next_idx];
+    window->cursor.row = 1;
+    window->cursor.column = 1;
+    window->scroll.vertical = 0;
+    window->scroll.horizontal = 0;
+  } else if (command_buffer_length == 2 &&
+             strncmp(command_buffer, "bp", 2) == 0) {
+    size_t current_idx = 0;
+    for (size_t i = 0; i < ctx->n_buffers; i++) {
+      if (ctx->buffers[i] == window->current_buffer) {
+        current_idx = i;
+        break;
+      }
+    }
+    size_t prev_idx =
+        (current_idx == 0) ? ctx->n_buffers - 1 : current_idx - 1;
+    window->current_buffer = ctx->buffers[prev_idx];
+    window->cursor.row = 1;
+    window->cursor.column = 1;
+    window->scroll.vertical = 0;
+    window->scroll.horizontal = 0;
+  } else if (command_buffer_length > 0) {
+    bool is_number = true;
+    for (size_t i = 0; i < command_buffer_length; i++) {
+      if (!isdigit(command_buffer[i])) {
+        is_number = false;
+        break;
+      }
+    }
+    if (is_number) {
+      char *temp = realloc(command_buffer, command_buffer_length + 1);
+      if (temp != NULL) {
+        ctx->command_buffer = temp;
+        command_buffer = temp;
+        command_buffer[command_buffer_length] = '\0';
+      }
+      int line_number_int = atoi(command_buffer);
+      size_t line_number = line_number_int < 0 ? 0 : (size_t)line_number_int;
+      if (line_number > window->current_buffer->length) {
+        line_number = window->current_buffer->length;
+      }
+      window->cursor.row = line_number;
+      window->cursor.column = 1;
+    }
+  }
+}
+
 void handle_command_mode(Context *ctx, unsigned char c) {
   Window *window = ctx->windows[ctx->current_window];
   EditorMode *mode = &ctx->mode;
@@ -231,67 +300,7 @@ void handle_command_mode(Context *ctx, unsigned char c) {
     break;
   case '\r':
   case '\n':
-    if (*command_buffer_length == 1 && (*command_buffer)[0] == 'w') {
-      save_buffer(window->current_buffer);
-    } else if (*command_buffer_length == 1 && (*command_buffer)[0] == 'q') {
-      *running = false;
-    } else if (*command_buffer_length == 1 && (*command_buffer)[0] == 'x') {
-      save_buffer(window->current_buffer);
-      *running = false;
-    } else if (*command_buffer_length == 2 &&
-               strncmp(*command_buffer, "bn", 2) == 0) {
-      size_t current_idx = 0;
-      for (size_t i = 0; i < ctx->n_buffers; i++) {
-        if (ctx->buffers[i] == window->current_buffer) {
-          current_idx = i;
-          break;
-        }
-      }
-      size_t next_idx = (current_idx + 1) % ctx->n_buffers;
-      window->current_buffer = ctx->buffers[next_idx];
-      window->cursor.row = 1;
-      window->cursor.column = 1;
-      window->scroll.vertical = 0;
-      window->scroll.horizontal = 0;
-    } else if (*command_buffer_length == 2 &&
-               strncmp(*command_buffer, "bp", 2) == 0) {
-      size_t current_idx = 0;
-      for (size_t i = 0; i < ctx->n_buffers; i++) {
-        if (ctx->buffers[i] == window->current_buffer) {
-          current_idx = i;
-          break;
-        }
-      }
-      size_t prev_idx =
-          (current_idx == 0) ? ctx->n_buffers - 1 : current_idx - 1;
-      window->current_buffer = ctx->buffers[prev_idx];
-      window->cursor.row = 1;
-      window->cursor.column = 1;
-      window->scroll.vertical = 0;
-      window->scroll.horizontal = 0;
-    } else if (*command_buffer_length > 0) {
-      bool is_number = true;
-      for (size_t i = 0; i < *command_buffer_length; i++) {
-        if (!isdigit((*command_buffer)[i])) {
-          is_number = false;
-          break;
-        }
-      }
-      if (is_number) {
-        char *temp = realloc(*command_buffer, *command_buffer_length + 1);
-        if (temp != NULL) {
-          *command_buffer = temp;
-          (*command_buffer)[*command_buffer_length] = '\0';
-        }
-        int line_number_int = atoi(*command_buffer);
-        size_t line_number = line_number_int < 0 ? 0 : (size_t)line_number_int;
-        if (line_number > window->current_buffer->length) {
-          line_number = window->current_buffer->length;
-        }
-        window->cursor.row = line_number;
-        window->cursor.column = 1;
-      }
-    }
+    execute_command(ctx);
     *mode = MODE_NORMAL;
     free(*command_buffer);
     *command_buffer = NULL;
