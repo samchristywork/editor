@@ -62,6 +62,7 @@ void push_undo_state(Context *ctx) {
 
     for (size_t i = 0; i < buffer->length; i++) {
       state->lines[i].length = buffer->lines[i].length;
+      state->lines[i].capacity = buffer->lines[i].capacity;
       if (buffer->lines[i].length > 0 && buffer->lines[i].data != NULL) {
         state->lines[i].data = malloc(buffer->lines[i].length);
         if (state->lines[i].data != NULL) {
@@ -69,9 +70,11 @@ void push_undo_state(Context *ctx) {
                  buffer->lines[i].length);
         } else {
           state->lines[i].length = 0;
+          state->lines[i].capacity = 0;
         }
       } else {
         state->lines[i].data = NULL;
+        state->lines[i].capacity = 0;
       }
     }
   } else {
@@ -105,6 +108,7 @@ void undo(Context *ctx) {
     if (buffer->lines != NULL) {
       for (size_t i = 0; i < state->length; i++) {
         buffer->lines[i].length = state->lines[i].length;
+        buffer->lines[i].capacity = state->lines[i].capacity;
         if (state->lines[i].length > 0 && state->lines[i].data != NULL) {
           buffer->lines[i].data = malloc(state->lines[i].length);
           if (buffer->lines[i].data != NULL) {
@@ -113,9 +117,11 @@ void undo(Context *ctx) {
           } else {
             buffer->lines[i].data = NULL;
             buffer->lines[i].length = 0;
+            buffer->lines[i].capacity = 0;
           }
         } else {
           buffer->lines[i].data = NULL;
+          buffer->lines[i].capacity = 0;
         }
       }
     }

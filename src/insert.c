@@ -11,6 +11,7 @@ static void ensure_buffer_initialized(Buffer *buffer) {
     }
     buffer->lines[0].data = NULL;
     buffer->lines[0].length = 0;
+    buffer->lines[0].capacity = 0;
     buffer->length = 1;
   }
 }
@@ -24,7 +25,16 @@ void insert_char(Window *window, char c) {
 
   Line *line = &buffer->lines[row];
 
-  line->data = realloc(line->data, line->length + 1);
+  if (line->length >= line->capacity) {
+    size_t new_capacity = line->capacity == 0 ? 16 : line->capacity * 2;
+    char *new_data = realloc(line->data, new_capacity);
+    if (new_data == NULL) {
+      return;
+    }
+    line->data = new_data;
+    line->capacity = new_capacity;
+  }
+
   memmove(line->data + col + 1, line->data + col, line->length - col);
   line->data[col] = c;
   line->length++;
@@ -43,8 +53,10 @@ void insert_newline(Window *window) {
   char *old_data = current_line->data;
 
   char *new_current_data = NULL;
+  size_t new_current_capacity = 0;
   if (col > 0) {
-    new_current_data = malloc(col);
+    new_current_capacity = col < 16 ? 16 : col * 2;
+    new_current_data = malloc(new_current_capacity);
     if (new_current_data != NULL) {
       memcpy(new_current_data, old_data, col);
     }
@@ -52,8 +64,10 @@ void insert_newline(Window *window) {
 
   char *new_line_data = NULL;
   size_t new_line_length = old_length - col;
+  size_t new_line_capacity = 0;
   if (new_line_length > 0) {
-    new_line_data = malloc(new_line_length);
+    new_line_capacity = new_line_length < 16 ? 16 : new_line_length * 2;
+    new_line_data = malloc(new_line_capacity);
     if (new_line_data != NULL) {
       memcpy(new_line_data, old_data + col, new_line_length);
     }
@@ -67,9 +81,11 @@ void insert_newline(Window *window) {
 
   buffer->lines[row].data = new_current_data;
   buffer->lines[row].length = col;
+  buffer->lines[row].capacity = new_current_capacity;
 
   buffer->lines[row + 1].data = new_line_data;
   buffer->lines[row + 1].length = new_line_length;
+  buffer->lines[row + 1].capacity = new_line_capacity;
 
   buffer->length++;
 

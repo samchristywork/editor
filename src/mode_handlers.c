@@ -322,30 +322,33 @@ void handle_command_mode(Context *ctx, unsigned char c) {
     free(*command_buffer);
     *command_buffer = NULL;
     *command_buffer_length = 0;
+    ctx->command_buffer_capacity = 0;
     break;
   case 127:
   case 8:
     if (*command_buffer_length > 0) {
       (*command_buffer_length)--;
-      if (*command_buffer_length > 0) {
-        char *temp = realloc(*command_buffer, *command_buffer_length);
-        if (temp != NULL) {
-          *command_buffer = temp;
-        }
-      } else {
+      if (*command_buffer_length == 0) {
         free(*command_buffer);
         *command_buffer = NULL;
+        ctx->command_buffer_capacity = 0;
       }
     }
     break;
   default:
     if (c >= 32 && c <= 126) {
-      char *temp = realloc(*command_buffer, *command_buffer_length + 1);
-      if (temp != NULL) {
-        *command_buffer = temp;
-        (*command_buffer)[*command_buffer_length] = c;
-        (*command_buffer_length)++;
+      if (*command_buffer_length >= ctx->command_buffer_capacity) {
+        size_t new_capacity = ctx->command_buffer_capacity == 0 ? 16 : ctx->command_buffer_capacity * 2;
+        char *temp = realloc(*command_buffer, new_capacity);
+        if (temp != NULL) {
+          *command_buffer = temp;
+          ctx->command_buffer_capacity = new_capacity;
+        } else {
+          break;
+        }
       }
+      (*command_buffer)[*command_buffer_length] = c;
+      (*command_buffer_length)++;
     }
     break;
   }
@@ -376,25 +379,27 @@ void handle_search_mode(Context *ctx, unsigned char c) {
   case 8:
     if (*search_buffer_length > 0) {
       (*search_buffer_length)--;
-      if (*search_buffer_length > 0) {
-        char *temp = realloc(*search_buffer, *search_buffer_length);
-        if (temp != NULL) {
-          *search_buffer = temp;
-        }
-      } else {
+      if (*search_buffer_length == 0) {
         free(*search_buffer);
         *search_buffer = NULL;
+        ctx->search_buffer_capacity = 0;
       }
     }
     break;
   default:
     if (c >= 32 && c <= 126) {
-      char *temp = realloc(*search_buffer, *search_buffer_length + 1);
-      if (temp != NULL) {
-        *search_buffer = temp;
-        (*search_buffer)[*search_buffer_length] = c;
-        (*search_buffer_length)++;
+      if (*search_buffer_length >= ctx->search_buffer_capacity) {
+        size_t new_capacity = ctx->search_buffer_capacity == 0 ? 16 : ctx->search_buffer_capacity * 2;
+        char *temp = realloc(*search_buffer, new_capacity);
+        if (temp != NULL) {
+          *search_buffer = temp;
+          ctx->search_buffer_capacity = new_capacity;
+        } else {
+          break;
+        }
       }
+      (*search_buffer)[*search_buffer_length] = c;
+      (*search_buffer_length)++;
     }
     break;
   }

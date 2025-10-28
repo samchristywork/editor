@@ -60,6 +60,7 @@ static Buffer *create_buffer_from_file(File file) {
       return NULL;
     }
     buffer->lines[0].length = 0;
+    buffer->lines[0].capacity = 1;
     buffer->length = 1;
     return buffer;
   }
@@ -104,6 +105,7 @@ static Buffer *create_buffer_from_file(File file) {
       return NULL;
     }
     buffer->lines[buffer->length].length = line_length;
+    buffer->lines[buffer->length].capacity = line_length + 1;
     buffer->length++;
   }
 
@@ -123,6 +125,7 @@ static Buffer *create_buffer_from_file(File file) {
       return NULL;
     }
     buffer->lines[0].length = 0;
+    buffer->lines[0].capacity = 1;
     buffer->length = 1;
   }
 

@@ -50,11 +50,10 @@ void delete_range(Window *window, size_t start_row, size_t start_col,
             line->length - end_col);
     line->length -= delete_count;
 
-    if (line->length > 0) {
-      line->data = realloc(line->data, line->length);
-    } else {
+    if (line->length == 0) {
       free(line->data);
       line->data = NULL;
+      line->capacity = 0;
     }
     return;
   }
@@ -68,9 +67,11 @@ void delete_range(Window *window, size_t start_row, size_t start_col,
 
   size_t new_length = start_col + (end_line->length - end_col);
   char *new_data = NULL;
+  size_t new_capacity = 0;
 
   if (new_length > 0) {
-    new_data = malloc(new_length);
+    new_capacity = new_length < 16 ? 16 : new_length * 2;
+    new_data = malloc(new_capacity);
     if (new_data != NULL) {
       if (start_col > 0) {
         memcpy(new_data, start_line->data, start_col);
@@ -88,6 +89,7 @@ void delete_range(Window *window, size_t start_row, size_t start_col,
 
   buffer->lines[start_row].data = new_data;
   buffer->lines[start_row].length = new_length;
+  buffer->lines[start_row].capacity = new_capacity;
   size_t lines_to_remove = end_row - start_row;
   if (lines_to_remove > 0) {
     memmove(&buffer->lines[start_row + 1], &buffer->lines[end_row + 1],
@@ -139,10 +141,17 @@ void backspace_char(Window *window) {
     size_t prev_length = prev_line->length;
 
     if (line->length > 0) {
-      prev_line->data =
-          realloc(prev_line->data, prev_line->length + line->length);
+      size_t new_length = prev_line->length + line->length;
+      if (new_length > prev_line->capacity) {
+        size_t new_capacity = prev_line->capacity == 0 ? 16 : prev_line->capacity;
+        while (new_capacity < new_length) {
+          new_capacity *= 2;
+        }
+        prev_line->data = realloc(prev_line->data, new_capacity);
+        prev_line->capacity = new_capacity;
+      }
       memcpy(prev_line->data + prev_line->length, line->data, line->length);
-      prev_line->length += line->length;
+      prev_line->length = new_length;
       free(line->data);
     }
 

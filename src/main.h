@@ -23,6 +23,7 @@ typedef struct {
 typedef struct {
   char *data;
   size_t length;
+  size_t capacity;
 } Line;
 
 typedef struct {
@@ -89,8 +90,10 @@ typedef struct {
   Selection selection;
   char *command_buffer;
   size_t command_buffer_length;
+  size_t command_buffer_capacity;
   char *search_buffer;
   size_t search_buffer_length;
+  size_t search_buffer_capacity;
   char **yank_buffer;
   size_t *yank_buffer_lengths;
   size_t yank_buffer_length;

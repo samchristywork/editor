@@ -265,8 +265,18 @@ static void draw_line(DrawBuffer *buf, Window *window, Line line, size_t n,
   Scroll scroll = window->scroll;
   set_cursor_position(buf, window->row + n, window->column);
 
-  bool *is_keyword_char = calloc(line.length, sizeof(bool));
-  bool *is_number_char = calloc(line.length, sizeof(bool));
+  #define MAX_STACK_LINE_LENGTH 4096
+  bool is_keyword_char_stack[MAX_STACK_LINE_LENGTH];
+  bool is_number_char_stack[MAX_STACK_LINE_LENGTH];
+  bool *is_keyword_char = NULL;
+  bool *is_number_char = NULL;
+
+  if (line.length <= MAX_STACK_LINE_LENGTH) {
+    memset(is_keyword_char_stack, 0, line.length * sizeof(bool));
+    memset(is_number_char_stack, 0, line.length * sizeof(bool));
+    is_keyword_char = is_keyword_char_stack;
+    is_number_char = is_number_char_stack;
+  }
 
   if (is_keyword_char && is_number_char) {
     size_t word_start = 0;
@@ -430,12 +440,7 @@ static void draw_line(DrawBuffer *buf, Window *window, Line line, size_t n,
   syntax_state->in_preprocessor_directive = false;
   syntax_state->in_keyword = false;
 
-  if (is_keyword_char) {
-    free(is_keyword_char);
-  }
-  if (is_number_char) {
-    free(is_number_char);
-  }
+  #undef MAX_STACK_LINE_LENGTH
 }
 
 static void constrain_cursor(Window *window) {

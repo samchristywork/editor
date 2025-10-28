@@ -160,12 +160,15 @@ static void paste_linewise(Context *ctx, Window *window, Buffer *buffer) {
   for (size_t i = 0; i < ctx->yank_buffer_length; i++) {
     size_t len = ctx->yank_buffer_lengths[i];
     if (ctx->yank_buffer[i] != NULL && len > 0) {
-      buffer->lines[insert_row + i].data = malloc(len);
+      size_t capacity = len < 16 ? 16 : len * 2;
+      buffer->lines[insert_row + i].data = malloc(capacity);
       memcpy(buffer->lines[insert_row + i].data, ctx->yank_buffer[i], len);
       buffer->lines[insert_row + i].length = len;
+      buffer->lines[insert_row + i].capacity = capacity;
     } else {
       buffer->lines[insert_row + i].data = NULL;
       buffer->lines[insert_row + i].length = 0;
+      buffer->lines[insert_row + i].capacity = 0;
     }
   }
 
@@ -181,10 +184,18 @@ static void paste_single_line(Context *ctx, Window *window, Buffer *buffer) {
 
   if (ctx->yank_buffer[0] != NULL && yank_len > 0) {
     Line *line = &buffer->lines[row];
-    line->data = realloc(line->data, line->length + yank_len);
+    size_t new_length = line->length + yank_len;
+    if (new_length > line->capacity) {
+      size_t new_capacity = line->capacity == 0 ? 16 : line->capacity;
+      while (new_capacity < new_length) {
+        new_capacity *= 2;
+      }
+      line->data = realloc(line->data, new_capacity);
+      line->capacity = new_capacity;
+    }
     memmove(line->data + col + yank_len, line->data + col, line->length - col);
     memcpy(line->data + col, ctx->yank_buffer[0], yank_len);
-    line->length += yank_len;
+    line->length = new_length;
     window->cursor.column += yank_len;
   }
 }
@@ -221,25 +232,39 @@ static void paste_multiple_lines(Context *ctx, Window *window, Buffer *buffer) {
     if (ctx->yank_buffer[i] != NULL && yank_len > 0) {
       if (i == 0) {
         Line *line = &buffer->lines[row];
-        line->data = realloc(line->data, line->length + yank_len);
+        size_t new_length = line->length + yank_len;
+        if (new_length > line->capacity) {
+          size_t new_capacity = line->capacity == 0 ? 16 : line->capacity;
+          while (new_capacity < new_length) {
+            new_capacity *= 2;
+          }
+          line->data = realloc(line->data, new_capacity);
+          line->capacity = new_capacity;
+        }
         memcpy(line->data + line->length, ctx->yank_buffer[i], yank_len);
-        line->length += yank_len;
+        line->length = new_length;
       } else if (i == ctx->yank_buffer_length - 1) {
-        buffer->lines[row + i].data = malloc(yank_len + rest_len);
+        size_t new_length = yank_len + rest_len;
+        size_t capacity = new_length < 16 ? 16 : new_length * 2;
+        buffer->lines[row + i].data = malloc(capacity);
         memcpy(buffer->lines[row + i].data, ctx->yank_buffer[i], yank_len);
         if (rest_of_line != NULL) {
           memcpy(buffer->lines[row + i].data + yank_len, rest_of_line,
                  rest_len);
         }
-        buffer->lines[row + i].length = yank_len + rest_len;
+        buffer->lines[row + i].length = new_length;
+        buffer->lines[row + i].capacity = capacity;
       } else {
-        buffer->lines[row + i].data = malloc(yank_len);
+        size_t capacity = yank_len < 16 ? 16 : yank_len * 2;
+        buffer->lines[row + i].data = malloc(capacity);
         memcpy(buffer->lines[row + i].data, ctx->yank_buffer[i], yank_len);
         buffer->lines[row + i].length = yank_len;
+        buffer->lines[row + i].capacity = capacity;
       }
     } else {
       buffer->lines[row + i].data = NULL;
       buffer->lines[row + i].length = 0;
+      buffer->lines[row + i].capacity = 0;
     }
   }
 
