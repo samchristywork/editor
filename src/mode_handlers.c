@@ -304,9 +304,7 @@ static void execute_command(Context *ctx) {
 }
 
 void handle_command_mode(Context *ctx, unsigned char c) {
-  Window *window = ctx->windows[ctx->current_window];
   EditorMode *mode = &ctx->mode;
-  bool *running = &ctx->running;
   char **command_buffer = &ctx->command_buffer;
   size_t *command_buffer_length = &ctx->command_buffer_length;
 

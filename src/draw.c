@@ -542,6 +542,14 @@ void draw_screen(Window *window, size_t width, size_t height, EditorMode mode,
   window->column = 1;
   window->width = width;
   window->height = height - 1;
+
+  if (show_line_numbers) {
+    size_t num_digits = snprintf(NULL, 0, "%zu", window->current_buffer->length);
+    if (num_digits < 3)
+      num_digits = 3;
+    window->width -= (num_digits + 1);
+  }
+
   update_scroll(window);
 
   draw_window_with_line_numbers(&buf, window, mode, selection, show_line_numbers);
