@@ -541,6 +541,7 @@ void draw_screen(Window *window, size_t width, size_t height, EditorMode mode,
                  size_t search_buffer_length, bool show_line_numbers) {
   DrawBuffer buf;
   draw_buffer_init(&buf, 65536);
+  draw_buffer_append_str(&buf, "\x1b[?25l");
 
   constrain_cursor(window);
   window->row = 1;
@@ -579,6 +580,8 @@ void draw_screen(Window *window, size_t width, size_t height, EditorMode mode,
   } else {
     draw_buffer_append_str(&buf, "\x1b[2 q");
   }
+
+  draw_buffer_append_str(&buf, "\x1b[?25h");
 
   fwrite(buf.data, 1, buf.length, stdout);
   fflush(stdout);
