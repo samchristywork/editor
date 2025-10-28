@@ -5,6 +5,8 @@
 
 void yank_selection(Context *ctx);
 
+void yank_current_line(Context *ctx);
+
 void paste_buffer(Context *ctx);
 
 #endif

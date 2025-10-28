@@ -107,6 +107,13 @@ void handle_normal_mode(Context *ctx, unsigned char c) {
       }
     }
     break;
+  case 'y':
+    if (read(STDIN_FILENO, &c, 1) == 1) {
+      if (c == 'y') {
+        yank_current_line(ctx);
+      }
+    }
+    break;
   case 'c':
     if (read(STDIN_FILENO, &c, 1) == 1) {
       if (c == 'i') {

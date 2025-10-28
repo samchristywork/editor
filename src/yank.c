@@ -299,6 +299,16 @@ void yank_selection(Context *ctx) {
   }
 }
 
+void yank_current_line(Context *ctx) {
+  Window *window = ctx->windows[ctx->current_window];
+  Buffer *buffer = window->current_buffer;
+
+  free_yank_buffer(ctx);
+
+  size_t current_row = window->cursor.row;
+  yank_linewise(ctx, buffer, current_row, current_row);
+}
+
 void paste_buffer(Context *ctx) {
   Window *window = ctx->windows[ctx->current_window];
   Buffer *buffer = window->current_buffer;
