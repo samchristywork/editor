@@ -441,6 +441,20 @@ void handle_insert_mode(Context *ctx, unsigned char c) {
   }
 }
 
+static void move_cursor_to_selection_end(Context *ctx) {
+  Window *window = ctx->windows[ctx->current_window];
+  Selection *sel = &ctx->selection;
+
+  if (sel->end.row > sel->start.row ||
+      (sel->end.row == sel->start.row && sel->end.column >= sel->start.column)) {
+    window->cursor.row = sel->end.row;
+    window->cursor.column = sel->end.column;
+  } else {
+    window->cursor.row = sel->start.row;
+    window->cursor.column = sel->start.column;
+  }
+}
+
 void handle_visual_mode(Context *ctx, unsigned char c) {
   Window *window = ctx->windows[ctx->current_window];
   EditorMode *mode = &ctx->mode;
@@ -448,6 +462,7 @@ void handle_visual_mode(Context *ctx, unsigned char c) {
 
   switch (c) {
   case 27:
+    move_cursor_to_selection_end(ctx);
     *mode = MODE_NORMAL;
     break;
   case 'h':
@@ -482,11 +497,13 @@ void handle_visual_mode(Context *ctx, unsigned char c) {
     break;
   case 'y':
     yank_selection(ctx);
+    move_cursor_to_selection_end(ctx);
     *mode = MODE_NORMAL;
     break;
   case 'd':
     push_undo_state(ctx);
     delete_selection(ctx);
+    move_cursor_to_selection_end(ctx);
     *mode = MODE_NORMAL;
     break;
   case 'i':
@@ -717,5 +734,15 @@ void handle_visual_mode(Context *ctx, unsigned char c) {
   if (update_selection_end) {
     ctx->selection.end.row = window->cursor.row;
     ctx->selection.end.column = window->cursor.column;
+  } else {
+    Selection *sel = &ctx->selection;
+    if (sel->end.row > sel->start.row ||
+        (sel->end.row == sel->start.row && sel->end.column >= sel->start.column)) {
+      window->cursor.row = sel->end.row;
+      window->cursor.column = sel->end.column;
+    } else {
+      window->cursor.row = sel->start.row;
+      window->cursor.column = sel->start.column;
+    }
   }
 }
