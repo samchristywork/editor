@@ -189,6 +189,7 @@ static void handle_sigwinch(int sig) {
               global_ctx->mode, &global_ctx->selection,
               global_ctx->command_buffer, global_ctx->command_buffer_length,
               global_ctx->search_buffer, global_ctx->search_buffer_length,
+              global_ctx->filter_buffer, global_ctx->filter_buffer_length,
               global_ctx->show_line_numbers);
 }
 
@@ -265,6 +266,10 @@ int main(int argc, char *argv[]) {
   ctx.command_buffer_length = 0;
   ctx.search_buffer = NULL;
   ctx.search_buffer_length = 0;
+  ctx.search_buffer_capacity = 0;
+  ctx.filter_buffer = NULL;
+  ctx.filter_buffer_length = 0;
+  ctx.filter_buffer_capacity = 0;
   ctx.yank_buffer = NULL;
   ctx.yank_buffer_lengths = NULL;
   ctx.yank_buffer_length = 0;
@@ -286,7 +291,8 @@ int main(int argc, char *argv[]) {
   draw_screen(ctx.windows[ctx.current_window], ctx.terminal.width,
               ctx.terminal.height, ctx.mode, &ctx.selection, ctx.command_buffer,
               ctx.command_buffer_length, ctx.search_buffer,
-              ctx.search_buffer_length, ctx.show_line_numbers);
+              ctx.search_buffer_length, ctx.filter_buffer,
+              ctx.filter_buffer_length, ctx.show_line_numbers);
   while (ctx.running) {
     handle_input(&ctx);
   }

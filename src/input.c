@@ -30,6 +30,8 @@ void handle_input(Context *ctx) {
         handle_command_mode(ctx, c);
       } else if (ctx->mode == MODE_SEARCH) {
         handle_search_mode(ctx, c);
+      } else if (ctx->mode == MODE_FILTER) {
+        handle_filter_mode(ctx, c);
       } else if (ctx->mode == MODE_INSERT) {
         handle_insert_mode(ctx, c);
       } else if (ctx->mode == MODE_LINEWISE_VISUAL ||
@@ -39,6 +41,7 @@ void handle_input(Context *ctx) {
       draw_screen(window, width, height, ctx->mode, &ctx->selection,
                   ctx->command_buffer, ctx->command_buffer_length,
                   ctx->search_buffer, ctx->search_buffer_length,
+                  ctx->filter_buffer, ctx->filter_buffer_length,
                   ctx->show_line_numbers);
     }
   }

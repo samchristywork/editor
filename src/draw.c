@@ -158,7 +158,8 @@ static void set_cursor_position(DrawBuffer *buf, size_t row, size_t column) {
 static void draw_status_bar(DrawBuffer *buf, size_t width, size_t height,
                             Cursor cursor, EditorMode mode, char *command_buffer,
                             size_t command_buffer_length, char *search_buffer,
-                            size_t search_buffer_length, const char *filename) {
+                            size_t search_buffer_length, char *filter_buffer,
+                            size_t filter_buffer_length, const char *filename) {
   set_cursor_position(buf, height, 1);
   draw_buffer_append_str(buf, "\x1b[7m");
   char status_bar_text[256];
@@ -168,6 +169,9 @@ static void draw_status_bar(DrawBuffer *buf, size_t width, size_t height,
   } else if (mode == MODE_SEARCH) {
     snprintf(status_bar_text, 256, "/%.*s", (int)search_buffer_length,
              search_buffer ? search_buffer : "");
+  } else if (mode == MODE_FILTER) {
+    snprintf(status_bar_text, 256, "!%.*s", (int)filter_buffer_length,
+             filter_buffer ? filter_buffer : "");
   } else if (mode == MODE_LINEWISE_VISUAL) {
     snprintf(status_bar_text, 256, "%s -- VISUAL LINE -- %zu %zu",
              filename ? filename : "[No Name]", cursor.row, cursor.column);
@@ -538,7 +542,8 @@ static void draw_window_with_line_numbers(DrawBuffer *buf, Window *window,
 void draw_screen(Window *window, size_t width, size_t height, EditorMode mode,
                  Selection *selection, char *command_buffer,
                  size_t command_buffer_length, char *search_buffer,
-                 size_t search_buffer_length, bool show_line_numbers) {
+                 size_t search_buffer_length, char *filter_buffer,
+                 size_t filter_buffer_length, bool show_line_numbers) {
   DrawBuffer buf;
   draw_buffer_init(&buf, 65536);
   draw_buffer_append_str(&buf, "\x1b[?25l");
@@ -561,6 +566,7 @@ void draw_screen(Window *window, size_t width, size_t height, EditorMode mode,
   draw_window_with_line_numbers(&buf, window, mode, selection, show_line_numbers);
   draw_status_bar(&buf, width, height, window->cursor, mode, command_buffer,
                   command_buffer_length, search_buffer, search_buffer_length,
+                  filter_buffer, filter_buffer_length,
                   window->current_buffer->file.name);
 
   size_t screen_row = window->cursor.row - window->scroll.vertical;

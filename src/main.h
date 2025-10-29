@@ -11,7 +11,8 @@ typedef enum {
   MODE_NORMAL,
   MODE_LINEWISE_VISUAL,
   MODE_CHARACTERWISE_VISUAL,
-  MODE_SEARCH
+  MODE_SEARCH,
+  MODE_FILTER
 } EditorMode;
 
 typedef struct {
@@ -94,6 +95,9 @@ typedef struct {
   char *search_buffer;
   size_t search_buffer_length;
   size_t search_buffer_capacity;
+  char *filter_buffer;
+  size_t filter_buffer_length;
+  size_t filter_buffer_capacity;
   char **yank_buffer;
   size_t *yank_buffer_lengths;
   size_t yank_buffer_length;

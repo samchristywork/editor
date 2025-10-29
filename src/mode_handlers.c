@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 #include "delete.h"
@@ -440,6 +441,201 @@ void handle_search_mode(Context *ctx, unsigned char c) {
   }
 }
 
+static void execute_filter(Context *ctx) {
+  Window *window = ctx->windows[ctx->current_window];
+  Buffer *buffer = window->current_buffer;
+  Selection *sel = &ctx->selection;
+  char *filter_buffer = ctx->filter_buffer;
+  size_t filter_buffer_length = ctx->filter_buffer_length;
+
+  if (filter_buffer_length == 0) {
+    return;
+  }
+
+  char *command = malloc(filter_buffer_length + 1);
+  if (command == NULL) {
+    return;
+  }
+  memcpy(command, filter_buffer, filter_buffer_length);
+  command[filter_buffer_length] = '\0';
+
+  size_t start_row = sel->start.row;
+  size_t end_row = sel->end.row;
+  if (start_row > end_row) {
+    size_t temp = start_row;
+    start_row = end_row;
+    end_row = temp;
+  }
+
+  size_t num_lines = end_row - start_row + 1;
+  size_t total_size = 0;
+  for (size_t i = start_row - 1; i < end_row && i < buffer->length; i++) {
+    total_size += buffer->lines[i].length + 1;
+  }
+
+  char *input_text = malloc(total_size);
+  if (input_text == NULL) {
+    free(command);
+    return;
+  }
+
+  size_t offset = 0;
+  for (size_t i = start_row - 1; i < end_row && i < buffer->length; i++) {
+    if (buffer->lines[i].length > 0 && buffer->lines[i].data != NULL) {
+      memcpy(input_text + offset, buffer->lines[i].data, buffer->lines[i].length);
+      offset += buffer->lines[i].length;
+    }
+    input_text[offset++] = '\n';
+  }
+
+  int pipe_in[2], pipe_out[2];
+  if (pipe(pipe_in) == -1 || pipe(pipe_out) == -1) {
+    free(command);
+    free(input_text);
+    return;
+  }
+
+  pid_t pid = fork();
+  if (pid == -1) {
+    free(command);
+    free(input_text);
+    close(pipe_in[0]);
+    close(pipe_in[1]);
+    close(pipe_out[0]);
+    close(pipe_out[1]);
+    return;
+  }
+
+  if (pid == 0) {
+    close(pipe_in[1]);
+    close(pipe_out[0]);
+    dup2(pipe_in[0], STDIN_FILENO);
+    dup2(pipe_out[1], STDOUT_FILENO);
+    close(pipe_in[0]);
+    close(pipe_out[1]);
+    execl("/bin/sh", "sh", "-c", command, NULL);
+    exit(1);
+  }
+
+  close(pipe_in[0]);
+  close(pipe_out[1]);
+
+  write(pipe_in[1], input_text, offset);
+  close(pipe_in[1]);
+  free(input_text);
+
+  char *output = NULL;
+  size_t output_size = 0;
+  size_t output_capacity = 0;
+  char read_buffer[4096];
+  ssize_t bytes_read;
+
+  while ((bytes_read = read(pipe_out[0], read_buffer, sizeof(read_buffer))) > 0) {
+    if (output_size + bytes_read > output_capacity) {
+      size_t new_capacity = output_capacity == 0 ? 4096 : output_capacity * 2;
+      while (output_size + bytes_read > new_capacity) {
+        new_capacity *= 2;
+      }
+      char *new_output = realloc(output, new_capacity);
+      if (new_output == NULL) {
+        free(output);
+        free(command);
+        close(pipe_out[0]);
+        return;
+      }
+      output = new_output;
+      output_capacity = new_capacity;
+    }
+    memcpy(output + output_size, read_buffer, bytes_read);
+    output_size += bytes_read;
+  }
+
+  close(pipe_out[0]);
+  free(command);
+
+  waitpid(pid, NULL, 0);
+
+  push_undo_state(ctx);
+  window->cursor.row = start_row;
+  window->cursor.column = 1;
+  for (size_t i = 0; i < num_lines; i++) {
+    delete_line(window);
+    if (window->cursor.row > start_row) {
+      window->cursor.row--;
+    }
+  }
+
+  if (output_size > 0) {
+    window->cursor.row = start_row - 1;
+    if (window->cursor.row < 1) {
+      window->cursor.row = 1;
+    }
+    window->cursor.column = 1;
+
+    for (size_t i = 0; i < output_size; i++) {
+      if (output[i] == '\n') {
+        insert_newline(window);
+      } else {
+        insert_char(window, output[i]);
+      }
+    }
+  }
+
+  free(output);
+}
+
+void handle_filter_mode(Context *ctx, unsigned char c) {
+  EditorMode *mode = &ctx->mode;
+  char **filter_buffer = &ctx->filter_buffer;
+  size_t *filter_buffer_length = &ctx->filter_buffer_length;
+
+  switch (c) {
+  case 27:
+    *mode = MODE_LINEWISE_VISUAL;
+    free(*filter_buffer);
+    *filter_buffer = NULL;
+    *filter_buffer_length = 0;
+    ctx->filter_buffer_capacity = 0;
+    break;
+  case '\r':
+  case '\n':
+    execute_filter(ctx);
+    *mode = MODE_NORMAL;
+    free(*filter_buffer);
+    *filter_buffer = NULL;
+    *filter_buffer_length = 0;
+    ctx->filter_buffer_capacity = 0;
+    break;
+  case 127:
+  case 8:
+    if (*filter_buffer_length > 0) {
+      (*filter_buffer_length)--;
+      if (*filter_buffer_length == 0) {
+        free(*filter_buffer);
+        *filter_buffer = NULL;
+        ctx->filter_buffer_capacity = 0;
+      }
+    }
+    break;
+  default:
+    if (c >= 32 && c <= 126) {
+      if (*filter_buffer_length >= ctx->filter_buffer_capacity) {
+        size_t new_capacity = ctx->filter_buffer_capacity == 0 ? 16 : ctx->filter_buffer_capacity * 2;
+        char *temp = realloc(*filter_buffer, new_capacity);
+        if (temp != NULL) {
+          *filter_buffer = temp;
+          ctx->filter_buffer_capacity = new_capacity;
+        } else {
+          break;
+        }
+      }
+      (*filter_buffer)[*filter_buffer_length] = c;
+      (*filter_buffer_length)++;
+    }
+    break;
+  }
+}
+
 void handle_insert_mode(Context *ctx, unsigned char c) {
   Window *window = ctx->windows[ctx->current_window];
   EditorMode *mode = &ctx->mode;
@@ -533,6 +729,15 @@ void handle_visual_mode(Context *ctx, unsigned char c) {
     delete_selection(ctx);
     move_cursor_to_selection_end(ctx);
     *mode = MODE_NORMAL;
+    break;
+  case 'f':
+    if (*mode == MODE_LINEWISE_VISUAL) {
+      free(ctx->filter_buffer);
+      ctx->filter_buffer = NULL;
+      ctx->filter_buffer_length = 0;
+      ctx->filter_buffer_capacity = 0;
+      *mode = MODE_FILTER;
+    }
     break;
   case 'i':
     if (*mode == MODE_CHARACTERWISE_VISUAL) {
