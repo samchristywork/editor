@@ -189,6 +189,10 @@ void handle_normal_mode(Context *ctx, unsigned char c) {
     *mode = MODE_COMMAND;
     break;
   case '/':
+    free(*search_buffer);
+    *search_buffer = NULL;
+    *search_buffer_length = 0;
+    ctx->search_buffer_capacity = 0;
     *mode = MODE_SEARCH;
     break;
   case 'p':
