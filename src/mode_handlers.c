@@ -19,19 +19,35 @@ void handle_normal_mode(Context *ctx, unsigned char c) {
   EditorMode *mode = &ctx->mode;
   char **search_buffer = &ctx->search_buffer;
   size_t *search_buffer_length = &ctx->search_buffer_length;
+  size_t repeat_count = ctx->count > 0 ? ctx->count : 1;
+
+  if (isdigit(c)) {
+    if (c != '0' || ctx->count > 0) {
+      ctx->count = ctx->count * 10 + (c - '0');
+      return;
+    }
+  }
 
   switch (c) {
   case 'h':
-    window->cursor.column--;
+    for (size_t i = 0; i < repeat_count; i++) {
+      window->cursor.column--;
+    }
     break;
   case 'j':
-    window->cursor.row++;
+    for (size_t i = 0; i < repeat_count; i++) {
+      window->cursor.row++;
+    }
     break;
   case 'k':
-    window->cursor.row--;
+    for (size_t i = 0; i < repeat_count; i++) {
+      window->cursor.row--;
+    }
     break;
   case 'l':
-    window->cursor.column++;
+    for (size_t i = 0; i < repeat_count; i++) {
+      window->cursor.column++;
+    }
     break;
   case '0':
     window->cursor.column = 1;
@@ -82,16 +98,22 @@ void handle_normal_mode(Context *ctx, unsigned char c) {
   }
   case 'x':
     push_undo_state(ctx);
-    delete_char(window);
+    for (size_t i = 0; i < repeat_count; i++) {
+      delete_char(window);
+    }
     break;
   case 'd':
     if (read(STDIN_FILENO, &c, 1) == 1) {
       if (c == 'd') {
         push_undo_state(ctx);
-        delete_line(window);
+        for (size_t i = 0; i < repeat_count; i++) {
+          delete_line(window);
+        }
       } else if (c == 'w') {
         push_undo_state(ctx);
-        delete_word(window);
+        for (size_t i = 0; i < repeat_count; i++) {
+          delete_word(window);
+        }
       } else if (c == 'i') {
         unsigned char text_obj;
         if (read(STDIN_FILENO, &text_obj, 1) == 1) {
@@ -220,6 +242,8 @@ void handle_normal_mode(Context *ctx, unsigned char c) {
     }
     break;
   }
+
+  ctx->count = 0;
 }
 
 static size_t find_current_buffer_index(Context *ctx) {

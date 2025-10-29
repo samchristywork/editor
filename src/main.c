@@ -269,6 +269,7 @@ int main(int argc, char *argv[]) {
   ctx.yank_buffer_lengths = NULL;
   ctx.yank_buffer_length = 0;
   ctx.yank_linewise = false;
+  ctx.count = 0;
   global_ctx = &ctx;
 
   Arguments arguments = {0};

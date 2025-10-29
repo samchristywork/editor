@@ -100,6 +100,7 @@ typedef struct {
   bool yank_linewise;
   UndoStack undo_stack;
   bool show_line_numbers;
+  size_t count;
 } Context;
 
 typedef struct {
