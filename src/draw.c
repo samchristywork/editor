@@ -195,7 +195,8 @@ static void draw_status_bar(DrawBuffer *buf, size_t width, size_t height,
 
 static bool is_in_selection(size_t row, size_t col, EditorMode mode,
                             Selection *selection) {
-  if (mode != MODE_LINEWISE_VISUAL && mode != MODE_CHARACTERWISE_VISUAL) {
+  if (mode != MODE_LINEWISE_VISUAL && mode != MODE_CHARACTERWISE_VISUAL &&
+      mode != MODE_FILTER) {
     return false;
   }
 
@@ -213,7 +214,7 @@ static bool is_in_selection(size_t row, size_t col, EditorMode mode,
     end_col = tmp;
   }
 
-  if (mode == MODE_LINEWISE_VISUAL) {
+  if (mode == MODE_LINEWISE_VISUAL || mode == MODE_FILTER) {
     return row >= start_row && row <= end_row;
   } else {
     if (row < start_row || row > end_row) {
