@@ -64,7 +64,7 @@ void push_undo_state(Context *ctx) {
       state->lines[i].length = buffer->lines[i].length;
       state->lines[i].capacity = buffer->lines[i].capacity;
       if (buffer->lines[i].length > 0 && buffer->lines[i].data != NULL) {
-        state->lines[i].data = malloc(buffer->lines[i].length);
+        state->lines[i].data = malloc(buffer->lines[i].capacity);
         if (state->lines[i].data != NULL) {
           memcpy(state->lines[i].data, buffer->lines[i].data,
                  buffer->lines[i].length);
@@ -110,7 +110,7 @@ void undo(Context *ctx) {
         buffer->lines[i].length = state->lines[i].length;
         buffer->lines[i].capacity = state->lines[i].capacity;
         if (state->lines[i].length > 0 && state->lines[i].data != NULL) {
-          buffer->lines[i].data = malloc(state->lines[i].length);
+          buffer->lines[i].data = malloc(state->lines[i].capacity);
           if (buffer->lines[i].data != NULL) {
             memcpy(buffer->lines[i].data, state->lines[i].data,
                    state->lines[i].length);
