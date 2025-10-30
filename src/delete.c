@@ -217,6 +217,7 @@ void delete_line(Window *window) {
     }
     line->data = NULL;
     line->length = 0;
+    line->capacity = 0;
     window->cursor.column = 1;
     return;
   }

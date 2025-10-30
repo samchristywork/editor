@@ -565,13 +565,26 @@ static void execute_filter(Context *ctx) {
     }
   }
 
-  if (output_size > 0) {
-    window->cursor.row = start_row - 1;
-    if (window->cursor.row < 1) {
-      window->cursor.row = 1;
-    }
-    window->cursor.column = 1;
+  if (buffer->length == 0) {
+    free(output);
+    return;
+  }
 
+  if (window->cursor.row > buffer->length) {
+    window->cursor.row = buffer->length;
+  }
+  if (window->cursor.row < 1) {
+    window->cursor.row = 1;
+  }
+
+  if (start_row <= buffer->length) {
+    window->cursor.row = start_row;
+  } else {
+    window->cursor.row = buffer->length;
+  }
+  window->cursor.column = 1;
+
+  if (output_size > 0) {
     for (size_t i = 0; i < output_size; i++) {
       if (output[i] == '\n') {
         insert_newline(window);
