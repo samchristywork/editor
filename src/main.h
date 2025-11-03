@@ -3,6 +3,7 @@
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdio.h>
 #include <termios.h>
 
 typedef enum {
@@ -105,6 +106,9 @@ typedef struct {
   UndoStack undo_stack;
   bool show_line_numbers;
   size_t count;
+  FILE *record_file;
+  FILE *playback_file;
+  bool playback_mode;
 } Context;
 
 typedef struct {
@@ -123,6 +127,8 @@ typedef struct {
 
 typedef struct {
   FileList file_list;
+  char *record_filename;
+  char *playback_filename;
 } Arguments;
 
 #endif

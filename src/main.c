@@ -164,12 +164,25 @@ static void add_file(FileList *file_list, char *filename) {
 static void parse_arguments(int argc, char *argv[], Arguments *arguments) {
   arguments->file_list.files = NULL;
   arguments->file_list.length = 0;
-  if (argc == 1) {
-    add_file(&arguments->file_list, "Untitled");
-  } else {
-    for (int i = 1; i < argc; i++) {
+  arguments->record_filename = NULL;
+  arguments->playback_filename = NULL;
+
+  bool has_files = false;
+  for (int i = 1; i < argc; i++) {
+    if (strcmp(argv[i], "--record") == 0 && i + 1 < argc) {
+      arguments->record_filename = argv[i + 1];
+      i++;
+    } else if (strcmp(argv[i], "--playback") == 0 && i + 1 < argc) {
+      arguments->playback_filename = argv[i + 1];
+      i++;
+    } else {
       add_file(&arguments->file_list, argv[i]);
+      has_files = true;
     }
+  }
+
+  if (!has_files) {
+    add_file(&arguments->file_list, "Untitled");
   }
 }
 
@@ -251,6 +264,12 @@ static void cleanup(Context ctx, Arguments arguments) {
     free(ctx.yank_buffer);
     free(ctx.yank_buffer_lengths);
   }
+  if (ctx.record_file != NULL) {
+    fclose(ctx.record_file);
+  }
+  if (ctx.playback_file != NULL) {
+    fclose(ctx.playback_file);
+  }
   free_undo_stack(&ctx);
   leave_alt_screen(ctx);
 }
@@ -275,10 +294,24 @@ int main(int argc, char *argv[]) {
   ctx.yank_buffer_length = 0;
   ctx.yank_linewise = false;
   ctx.count = 0;
+  ctx.record_file = NULL;
+  ctx.playback_file = NULL;
+  ctx.playback_mode = false;
   global_ctx = &ctx;
 
   Arguments arguments = {0};
   parse_arguments(argc, argv, &arguments);
+
+  if (arguments.record_filename != NULL) {
+    ctx.record_file = fopen(arguments.record_filename, "wb");
+  }
+
+  if (arguments.playback_filename != NULL) {
+    ctx.playback_file = fopen(arguments.playback_filename, "rb");
+    if (ctx.playback_file != NULL) {
+      ctx.playback_mode = true;
+    }
+  }
 
   init_terminal(&ctx.terminal.attrs);
 
