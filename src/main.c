@@ -161,6 +161,25 @@ static void add_file(FileList *file_list, char *filename) {
   }
 }
 
+static void print_help(const char *program_name) {
+  printf("Usage: %s [OPTIONS] [FILES...]\n", program_name);
+  printf("\n");
+  printf("A vim-like text editor.\n");
+  printf("\n");
+  printf("Options:\n");
+  printf("  --help                 Show this help message and exit\n");
+  printf("  --record FILE          Record all input to FILE\n");
+  printf("  --playback FILE        Play back input from FILE and exit when done\n");
+  printf("  --playback-string STR  Play back input from string STR, then continue normally\n");
+  printf("\n");
+  printf("Examples:\n");
+  printf("  %s file.txt                            # Edit file.txt\n", program_name);
+  printf("  %s --record session.rec file.txt       # Record editing session\n", program_name);
+  printf("  %s --playback session.rec file.txt     # Play back recorded session\n", program_name);
+  printf("  %s --playback-string 'iHello' file.txt # Insert 'Hello' then continue\n", program_name);
+  printf("\n");
+}
+
 static void parse_arguments(int argc, char *argv[], Arguments *arguments) {
   arguments->file_list.files = NULL;
   arguments->file_list.length = 0;
@@ -170,7 +189,10 @@ static void parse_arguments(int argc, char *argv[], Arguments *arguments) {
 
   bool has_files = false;
   for (int i = 1; i < argc; i++) {
-    if (strcmp(argv[i], "--record") == 0 && i + 1 < argc) {
+    if (strcmp(argv[i], "--help") == 0) {
+      print_help(argv[0]);
+      exit(EXIT_SUCCESS);
+    } else if (strcmp(argv[i], "--record") == 0 && i + 1 < argc) {
       arguments->record_filename = argv[i + 1];
       i++;
     } else if (strcmp(argv[i], "--playback") == 0 && i + 1 < argc) {
