@@ -304,6 +304,7 @@ int main(int argc, char *argv[]) {
   ctx.playback_string = NULL;
   ctx.playback_string_index = 0;
   ctx.playback_string_length = 0;
+  ctx.literal_next = false;
   global_ctx = &ctx;
 
   Arguments arguments = {0};

@@ -653,7 +653,16 @@ void handle_insert_mode(Context *ctx, unsigned char c) {
   Window *window = ctx->windows[ctx->current_window];
   EditorMode *mode = &ctx->mode;
 
+  if (ctx->literal_next) {
+    insert_char(window, c);
+    ctx->literal_next = false;
+    return;
+  }
+
   switch (c) {
+  case 22:
+    ctx->literal_next = true;
+    break;
   case 27: {
     *mode = MODE_NORMAL;
     break;

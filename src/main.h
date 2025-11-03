@@ -112,6 +112,7 @@ typedef struct {
   char *playback_string;
   size_t playback_string_index;
   size_t playback_string_length;
+  bool literal_next;
 } Context;
 
 typedef struct {
