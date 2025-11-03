@@ -419,6 +419,8 @@ static void draw_line(DrawBuffer *buf, Window *window, Line line, size_t n,
 
     if (is_tab) {
       draw_buffer_append_str(buf, ">>");
+    } else if (buffer_col < line.length && (c < 32 || c == 127)) {
+      draw_buffer_append_str(buf, "\xef\xbf\xbd");
     } else {
       draw_buffer_append_char(buf, c);
     }
