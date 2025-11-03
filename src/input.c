@@ -18,7 +18,16 @@ void handle_input(Context *ctx) {
   unsigned char c;
   bool got_input = false;
 
-  if (ctx->playback_mode && ctx->playback_file != NULL) {
+  if (ctx->playback_mode && ctx->playback_string != NULL) {
+    if (ctx->playback_string_index < ctx->playback_string_length) {
+      c = (unsigned char)ctx->playback_string[ctx->playback_string_index];
+      ctx->playback_string_index++;
+      got_input = true;
+    } else {
+      ctx->playback_string = NULL;
+      ctx->playback_mode = (ctx->playback_file != NULL);
+    }
+  } else if (ctx->playback_mode && ctx->playback_file != NULL) {
     if (fread(&c, 1, 1, ctx->playback_file) == 1) {
       got_input = true;
     } else {

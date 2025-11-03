@@ -166,6 +166,7 @@ static void parse_arguments(int argc, char *argv[], Arguments *arguments) {
   arguments->file_list.length = 0;
   arguments->record_filename = NULL;
   arguments->playback_filename = NULL;
+  arguments->playback_string = NULL;
 
   bool has_files = false;
   for (int i = 1; i < argc; i++) {
@@ -174,6 +175,9 @@ static void parse_arguments(int argc, char *argv[], Arguments *arguments) {
       i++;
     } else if (strcmp(argv[i], "--playback") == 0 && i + 1 < argc) {
       arguments->playback_filename = argv[i + 1];
+      i++;
+    } else if (strcmp(argv[i], "--playback-string") == 0 && i + 1 < argc) {
+      arguments->playback_string = argv[i + 1];
       i++;
     } else {
       add_file(&arguments->file_list, argv[i]);
@@ -297,6 +301,9 @@ int main(int argc, char *argv[]) {
   ctx.record_file = NULL;
   ctx.playback_file = NULL;
   ctx.playback_mode = false;
+  ctx.playback_string = NULL;
+  ctx.playback_string_index = 0;
+  ctx.playback_string_length = 0;
   global_ctx = &ctx;
 
   Arguments arguments = {0};
@@ -311,6 +318,12 @@ int main(int argc, char *argv[]) {
     if (ctx.playback_file != NULL) {
       ctx.playback_mode = true;
     }
+  }
+
+  if (arguments.playback_string != NULL) {
+    ctx.playback_string = arguments.playback_string;
+    ctx.playback_string_length = strlen(arguments.playback_string);
+    ctx.playback_mode = true;
   }
 
   init_terminal(&ctx.terminal.attrs);

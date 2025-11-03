@@ -109,6 +109,9 @@ typedef struct {
   FILE *record_file;
   FILE *playback_file;
   bool playback_mode;
+  char *playback_string;
+  size_t playback_string_index;
+  size_t playback_string_length;
 } Context;
 
 typedef struct {
@@ -129,6 +132,7 @@ typedef struct {
   FileList file_list;
   char *record_filename;
   char *playback_filename;
+  char *playback_string;
 } Arguments;
 
 #endif
